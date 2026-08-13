@@ -1500,7 +1500,7 @@
           <img id="ai-preview-img" src="" class="absolute inset-0 w-full h-full object-cover hidden" alt="Food Scan Preview">
         </div>
 
-        <input type="file" id="ai-food-file-input" accept="image/*" class="hidden" onchange="handleAIFoodPhotoSelect(event)">
+        <input type="file" id="ai-food-file-input" accept="image/*" capture="environment" class="hidden" onchange="handleAIFoodPhotoSelect(event)">
 
         <div id="ai-processing-overlay" class="absolute inset-0 modal-bg backdrop-blur-md flex flex-col items-center justify-center hidden z-20 space-y-3 p-6 text-center">
           <div class="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
@@ -1842,7 +1842,7 @@ async function requestGeminiPlateauBreakoutAdvice() {
 
     let tempAIGeneratedPlanData = null;
 
-    // ✅ 2. 重構 AI 菜單生成器 (採用 gpt-4o-mini)
+    // ✅ 升級版 AI 菜單生成器 (支援多日分化與動態陣列)
 async function generatePlanWithGeminiAI() {
   const goal = document.getElementById('ai-plan-target-goal').value;
   const split = document.getElementById('ai-plan-split-type').value;
@@ -1854,65 +1854,106 @@ async function generatePlanWithGeminiAI() {
   const tdee = userProfile.tdee || 2250;
   const weight = userProfile.weight || 68;
 
-  showToast("✨ AI 正在根據你的 BMI/TDEE 生成專屬菜單...");
+  showToast("✨ AI 正在為您量身打造多日專屬菜單...");
 
   try {
-    const prompt = `你是一位世界頂級的力量舉與肌肥大教練。請根據以下學員數據，動態為他打造個人化訓練菜單：
-- 學員 BMI: ${bmi}
-- 每日 TDEE: ${tdee} kcal
-- 目前體重: ${weight} kg
+    // 嚴格規範 AI 生成的 JSON 結構必須包含 dailyPlans 陣列
+    const prompt = `你是一位世界頂級的力量與體態雕塑教練。請根據以下學員數據生成多日訓練計畫：
 - 訓練目標: ${goal}
 - 計畫架構: ${split}
 - 每週訓練天數: ${days}
+- 身體數據: BMI ${bmi}, TDEE ${tdee}kcal, 體重 ${weight}kg
 
-請特別注意：你必須只回覆合法的純 JSON 格式，嚴禁包含任何額外開場白或結語。
-JSON 結構必須嚴格符合以下欄位規範：
+請嚴格回覆純 JSON，不要包含 Markdown 語法或任何對話文本，格式必須為：
 {
-  "planTitle": "菜單名稱 (例如：4日 PPL 增肌突破計畫)",
-  "advice": "針對學員 BMI/TDEE 與目標的 2 句專業教練叮嚀",
-  "actions": [
-    { "name": "槓鈴臥推", "sets": 4, "reps": 10, "weight": 50 }
+  "planTitle": "計畫總稱 (例如: 4日 PPL 增肌計畫)",
+  "advice": "針對學員目標的 1 句專業叮嚀",
+  "dailyPlans": [
+    {
+      "dayTitle": "Day 1 - 推日 (或對應部位)",
+      "actions": [ { "name": "槓鈴平躺臥推", "sets": 4, "reps": 10, "weight": 50 } ]
+    },
+    {
+      "dayTitle": "Day 2 - 拉日 (依此類推)",
+      "actions": [ { "name": "傳統槓鈴硬舉", "sets": 4, "reps": 8, "weight": 60 } ]
+    }
   ]
 }`;
 
     const messages = [{ role: "user", content: prompt }];
-    
-    // 呼叫 ChatAnywhere 的 gpt-4o-mini 模型
     const responseText = await callSiliconFlowApi(messages, "gpt-4o-mini", true);
-
+    
     const cleanJsonStr = extractJsonFromString(responseText);
     const parsedData = JSON.parse(cleanJsonStr);
 
-    if (!parsedData.planTitle || !parsedData.actions || !Array.isArray(parsedData.actions)) {
-      throw new Error("INVALID_AI_RESPONSE_FORMAT");
-    }
+    if (!parsedData.planTitle || !parsedData.dailyPlans) throw new Error("FORMAT_ERROR");
 
     tempAIGeneratedPlanData = parsedData;
-
     document.getElementById('ai-plan-generated-title').textContent = parsedData.planTitle;
-    detailsBox.innerHTML = `
-      <p class="font-bold text-main">💡 教練叮嚀: ${parsedData.advice || '保持循序漸進增加重量！'}</p>
-      <div class="space-y-1.5 pt-2">
-        ${parsedData.actions.map(a => `
-          <div class="card-bg-sub p-2 rounded-lg border border-main flex justify-between items-center text-xs">
-            <span class="font-bold theme-text-primary">${a.name}</span>
-            <span class="font-mono text-sub">${a.sets}組 × ${a.reps}次 (${a.weight}kg)</span>
-          </div>
-        `).join('')}
-      </div>
-    `;
     
+    // UI 渲染分頁顯示每日計畫
+    let html = `<p class="font-bold text-main mb-2">💡 教練叮嚀: ${parsedData.advice}</p>`;
+    parsedData.dailyPlans.forEach(day => {
+      html += `<div class="mt-2 mb-1 p-2 card-bg-sub rounded-lg border theme-border-primary">`;
+      html += `<h5 class="text-[11px] font-black theme-text-primary mb-1">${day.dayTitle}</h5>`;
+      day.actions.forEach(a => {
+        html += `<div class="flex justify-between items-center text-[10px] text-main border-b border-main/50 pb-1 mb-1 last:border-0 last:mb-0 last:pb-0">
+          <span class="font-bold">${a.name}</span>
+          <span class="text-sub font-mono">${a.sets}組 × ${a.reps}次 (${a.weight}kg)</span>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    
+    detailsBox.innerHTML = html;
     resultBox.classList.remove('hidden');
-    showToast("✨ AI 個人化專屬菜單已成功生成！");
+    showToast("✨ AI 多日專屬菜單生成完成！");
 
   } catch (err) {
     console.error("AI 菜單生成失敗:", err);
-    if (err.message === 'MISSING_API_KEY') {
-      showToast("⚠️ 請先至「我的」頁面設定您的 ChatAnywhere API Key！");
-    } else {
-      showToast(`❌ 生成失敗 (${err.message || '請檢查 Key 或網路'})`);
-    }
+    showToast(`❌ 生成失敗，請確認 API Key 或重試`);
   }
+}
+// ✅ 新增：將 AI 多日計畫批次轉化為獨立模板
+function applyAIGeneratedPlanToTemplates() {
+  if (!tempAIGeneratedPlanData || !tempAIGeneratedPlanData.dailyPlans) {
+    showToast('⚠️ 尚未生成有效的 AI 菜單！');
+    return;
+  }
+  
+  let count = 0;
+  tempAIGeneratedPlanData.dailyPlans.forEach((day, index) => {
+    if (!day.actions || day.actions.length === 0) return;
+    
+    // 轉譯 AI 的動作，並套用預設 1RM 休息組數
+    const formattedActions = day.actions.map(act => {
+      // 模糊比對找出動作庫的 ID
+      const dbAct = actionDatabase.find(a => a.name.includes(act.name) || act.name.includes(a.name)) || actionDatabase[0];
+      const sets = [];
+      const setCount = parseInt(act.sets) || 4;
+      for (let i = 0; i < setCount; i++) {
+        sets.push({ 
+          weight: parseFloat(act.weight) || 20, 
+          reps: parseInt(act.reps) || 10, 
+          type: 'N', rpe: 8, rest: 60, done: false 
+        });
+      }
+      return { id: dbAct.id, name: act.name, sets: sets }; 
+    });
+
+    // 將每一天存為獨立的模板
+    customTemplates.push({
+      id: 'ai_' + Date.now() + '_' + index,
+      name: `🤖 ${tempAIGeneratedPlanData.planTitle} - ${day.dayTitle}`,
+      actions: formattedActions
+    });
+    count++;
+  });
+
+  renderTemplateList(); // 重新渲染模板列表
+  switchSubTab(1); // 自動跳轉到「模板」分頁
+  closeModal('modal-ai-picker-plan');
+  showToast(`✅ 成功匯入 ${count} 份獨立每日訓練模板！`);
 }
     // 統一的 Cloud Badge 更新器
     function updateCloudSyncBadge(text, bgClass, textClass, borderClass) {
@@ -4535,27 +4576,16 @@ function calculate1RM(weight, reps) {
 
    // ✅ 升級版 AI 與條碼分析函數 (支援雙模式)
 // ✅ 3. 食物相機視覺辨識 (gpt-4o-mini 支援原生 Vision 圖片傳遞)
-// ✅ 1. 修復條碼模式觸發邏輯 (移除舊照片干擾條件)
+// ✅ 升級版 AI 視覺與條碼雙模態解析 (自動調用相機)
 async function startRealAIFoodAnalysis() {
-  // 只要切換到條碼模式，點擊就必定彈出條碼輸入框
-  if (currentScanMode === 'barcode') {
-    const inputBarcode = prompt("【條碼查詢】\n請輸入商品包裝上的 EAN/UPC 條碼數字 (例如: 4710088410109)：");
-    if (inputBarcode && inputBarcode.trim()) {
-      await fetchOpenFoodFactsByBarcode(inputBarcode.trim());
-    }
-    return;
-  }
-
-  // 照片模式邏輯
   const effectiveKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY;
-
   if (!effectiveKey) {
-    showToast('⚠️ 請先至「我的」分頁設定您的 ChatAnywhere API Key！');
+    showToast('⚠️ 請先至「我的」分頁設定您的 API Key！');
     return;
   }
   if (!currentAIFoodPhotoBase64) {
-    showToast('請先拍攝或選擇照片！');
-    triggerAIFoodPhotoUpload();
+    showToast('請先拍攝實體或條碼照片！');
+    triggerAIFoodPhotoUpload(); // 這裡會自動開啟手機鏡頭
     return;
   }
 
@@ -4566,37 +4596,70 @@ async function startRealAIFoodAnalysis() {
   if (overlay) overlay.classList.remove('hidden');
   document.getElementById('ai-result-card')?.classList.add('hidden');
 
-  if (titleEl) titleEl.textContent = "AI 視覺辨識中...";
-  if (descEl) descEl.textContent = "正在透過 AI 大模型精準分析食物熱量與三大營養素...";
-
   try {
-    const promptText = "請精準識別圖片中的食物，必須回覆合法 JSON，格式為：{\"foodName\":\"繁體中文名稱\",\"portion\":\"份量估算\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":水分數字,\"emoji\":\"適當Emoji\",\"confidence\":95}";
-
-    const messages = [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: promptText },
-          { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } }
-        ]
+    if (currentScanMode === 'barcode') {
+      if (titleEl) titleEl.textContent = "相機掃描條碼中...";
+      if (descEl) descEl.textContent = "正在透過鏡頭解析圖片中的條碼或營養成分數據...";
+      
+      // 第一步：優先嘗試瀏覽器原生條碼 API (速度最快)
+      let detectedBarcode = null;
+      if ('BarcodeDetector' in window) {
+        try {
+          const img = document.getElementById('ai-preview-img');
+          const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'] });
+          const barcodes = await barcodeDetector.detect(img);
+          if (barcodes.length > 0) detectedBarcode = barcodes[0].rawValue;
+        } catch (e) { console.warn('原生 Barcode API 無法辨識:', e); }
       }
-    ];
 
-    const responseText = await callSiliconFlowApi(messages, "gpt-4o-mini", true);
-    const cleanJsonStr = extractJsonFromString(responseText);
-    const parsed = JSON.parse(cleanJsonStr);
+      // 成功解析條碼數字，拋給 Open Food Facts API
+      if (detectedBarcode) {
+        if (descEl) descEl.textContent = `掃描成功！條碼 [${detectedBarcode}]，檢索資料庫中...`;
+        await fetchOpenFoodFactsByBarcode(detectedBarcode);
+        if (overlay) overlay.classList.add('hidden');
+        return; 
+      }
 
-    currentAIFoodResult = parsed;
-    displayAIFoodResult(parsed);
-    showToast('✅ AI 視覺辨識完成！');
+      // 第二步：原生掃不到 (例如拍到背面營養表)，啟動 AI 視覺大模型強力解析
+      if (descEl) descEl.textContent = "啟動 AI 深度識別包裝營養表...";
+      const promptText = "這是一張食品包裝的條碼或背面營養成分表。請透過視覺讀取數據並回覆合法 JSON，格式為：{\"foodName\":\"食品名稱(或品牌)\",\"portion\":\"100g或1份\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":0,\"emoji\":\"📦\",\"confidence\":90}";
+      const messages = [ { role: "user", content: [ { type: "text", text: promptText }, { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } } ] } ];
+      
+      const responseText = await callSiliconFlowApi(messages, "gpt-4o-mini", true);
+      const parsed = JSON.parse(extractJsonFromString(responseText));
+      
+      currentAIFoodResult = parsed;
+      displayAIFoodResult(parsed);
+      showToast('✅ 標籤包裝辨識完成！');
+      
+    } else {
+      // 食物實體拍照模式
+      if (titleEl) titleEl.textContent = "AI 視覺辨識中...";
+      if (descEl) descEl.textContent = "正在透過 AI 精準分析照片中實物的熱量與三大營養素...";
+      
+      const promptText = "請精準識別圖片中的食物，必須回覆合法 JSON，格式為：{\"foodName\":\"繁體中文名稱\",\"portion\":\"份量估算\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":水分數字,\"emoji\":\"適當Emoji\",\"confidence\":95}";
+      const messages = [ { role: "user", content: [ { type: "text", text: promptText }, { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } } ] } ];
+      
+      const responseText = await callSiliconFlowApi(messages, "gpt-4o-mini", true);
+      const parsed = JSON.parse(extractJsonFromString(responseText));
+      
+      currentAIFoodResult = parsed;
+      displayAIFoodResult(parsed);
+      showToast('✅ AI 食物視覺辨識完成！');
+    }
   } catch (err) {
-    console.error("AI Vision Error:", err);
-    showToast(`辨識失敗: ${err.message || '請檢查 API Key 或網路'}`);
+    console.error("AI 辨識錯誤:", err);
+    // 降級處理：即使網絡失敗，也強制彈出卡片讓你能手動填寫，絕對不會沒反應
+    const fallbackFood = {
+      foodName: currentScanMode === 'barcode' ? "條碼商品(請修正)" : "未知食物(請修正)",
+      portion: "1份", calories: 200, carbs: 20, protein: 10, fat: 5, water: 0, emoji: currentScanMode === 'barcode' ? "📦" : "❓", confidence: 50
+    };
+    displayAIFoodResult(fallbackFood);
+    showToast(`⚠️ 自動辨識失敗，已開啟卡片供您手動修正`);
   } finally {
     if (overlay) overlay.classList.add('hidden');
   }
-}
-    function displayAIFoodResult(data) {
+}    function displayAIFoodResult(data) {
       document.getElementById('ai-res-emoji').textContent = data.emoji || '🍱';
       document.getElementById('ai-res-name-input').value = data.foodName || '未知食物';
       document.getElementById('ai-res-portion-input').value = data.portion || '1份 (約200g)';
