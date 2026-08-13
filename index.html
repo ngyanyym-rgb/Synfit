@@ -695,21 +695,35 @@
           </div>
         </div>
         
-        <!-- 新增: SiliconFlow API Key 設置 -->
-        <div class="p-4 card-bg rounded-2xl border border-main shadow-lg space-y-3">
-          <div class="flex justify-between items-center border-b border-main pb-2">
-            <h3 class="text-xs font-bold theme-text-primary uppercase tracking-wider flex items-center gap-1.5">
-              <span>🔑</span> SiliconFlow API Key 設置
-            </h3>
-          </div>
-          <p class="text-[11px] text-sub leading-relaxed">
-            為啟用「AI 智能菜單」、「平台期診斷」與「飲食相機辨識」，請先輸入您的個人專屬 SiliconFlow API Key。
-          </p>
-          <div class="flex gap-2">
-            <input id="gemini-api-key-input" type="password" placeholder="輸入 API Key..." class="flex-1 card-bg-sub border border-main rounded-xl px-3 py-2 text-xs text-main focus:outline-none border-theme-primary font-mono">
-            <button onclick="saveGeminiApiKey()" class="px-3 py-2 card-bg-sub border border-main text-xs font-bold rounded-xl text-sub hover:text-main">儲存</button>
-          </div>
-        </div>
+      <!-- 雙 API Key 設置卡片 -->
+<div class="p-4 card-bg rounded-2xl border border-main shadow-lg space-y-3">
+  <div class="flex justify-between items-center border-b border-main pb-2">
+    <h3 class="text-xs font-bold theme-text-primary uppercase tracking-wider flex items-center gap-1.5">
+      <span>🔑</span> AI 雙引擎 API Key 設置
+    </h3>
+  </div>
+  <p class="text-[11px] text-sub leading-relaxed">
+    為了讓文字功能與拍照功能皆能穩定運作，請分別填入對應平台的專屬 Key：
+  </p>
+
+  <!-- 1. ChatAnywhere Key (文字菜單/建議) -->
+  <div class="space-y-1">
+    <label class="text-[10px] font-bold text-main block">💬 ChatAnywhere Key (菜單生成/平台期建議)</label>
+    <div class="flex gap-2">
+      <input id="chatanywhere-api-key-input" type="password" placeholder="輸入 sk-... Key" class="flex-1 card-bg-sub border border-main rounded-xl px-3 py-2 text-xs text-main focus:outline-none border-theme-primary font-mono">
+      <button onclick="saveChatAnywhereKey()" class="px-3 py-2 card-bg-sub border border-main text-xs font-bold rounded-xl text-sub hover:text-main">儲存</button>
+    </div>
+  </div>
+
+  <!-- 2. Google Gemini Key (食物拍照/條碼) -->
+  <div class="space-y-1 pt-1">
+    <label class="text-[10px] font-bold theme-text-primary block">📸 Google Gemini Key (食物拍照辨識/條碼)</label>
+    <div class="flex gap-2">
+      <input id="gemini-api-key-input" type="password" placeholder="輸入 AIzaSy... Key" class="flex-1 card-bg-sub border border-main rounded-xl px-3 py-2 text-xs text-main focus:outline-none border-theme-primary font-mono">
+      <button onclick="saveGeminiApiKey()" class="px-3 py-2 card-bg-sub border border-main text-xs font-bold rounded-xl text-sub hover:text-main">儲存</button>
+    </div>
+  </div>
+</div>
 
         <div class="p-4 card-bg rounded-2xl border border-main shadow-lg space-y-3">
           <div class="flex justify-between items-center border-b border-main pb-2">
@@ -1712,17 +1726,50 @@
       }
     }
 
-    // 新增 Gemini API Key 儲存邏輯
-    function saveGeminiApiKey() {
+   // 全域變數定義
+let chatAnywhereKey = '';
+let geminiApiKey = '';
+
+// 1. 儲存 ChatAnywhere Key
+function saveChatAnywhereKey() {
+  const input = document.getElementById('chatanywhere-api-key-input');
+  chatAnywhereKey = input ? input.value.trim() : '';
+  if (chatAnywhereKey) {
+    dbSetItem('synfit_chatanywhere_api_key', chatAnywhereKey);
+    showToast('✅ ChatAnywhere Key 已成功儲存！');
+  } else {
+    showToast('請輸入有效的 ChatAnywhere Key');
+  }
+}
+
+// 2. 儲存 Google Gemini Key
+function saveGeminiApiKey() {
   const input = document.getElementById('gemini-api-key-input');
   geminiApiKey = input ? input.value.trim() : '';
   if (geminiApiKey) {
     dbSetItem('synfit_gemini_api_key', geminiApiKey);
-    showToast('✅ SiliconFlow API Key 已成功儲存！');
+    showToast('✅ Google Gemini Key 已成功儲存！');
   } else {
-    showToast('請輸入有效的 API Key');
+    showToast('請輸入有效的 Gemini Key');
   }
 }
+
+// 3. 在 window.onload 中自動載入已儲存的雙 Key
+window.addEventListener('load', async () => {
+  const savedChatKey = await dbGetItem('synfit_chatanywhere_api_key');
+  if (savedChatKey) {
+    chatAnywhereKey = savedChatKey;
+    const input = document.getElementById('chatanywhere-api-key-input');
+    if (input) input.value = chatAnywhereKey;
+  }
+
+  const savedGeminiKey = await dbGetItem('synfit_gemini_api_key');
+  if (savedGeminiKey) {
+    geminiApiKey = savedGeminiKey;
+    const input = document.getElementById('gemini-api-key-input');
+    if (input) input.value = geminiApiKey;
+  }
+});
 
     function speakVoicePrompt(text) {
       if (!voiceCoachEnabled || !('speechSynthesis' in window)) return;
@@ -4952,14 +4999,15 @@ function extractJsonFromString(str) {
   return match ? match[0] : str;
 }
 
-// 1️⃣ 文字專用 API 函數 (ChatAnywhere) -> 用於生成菜單與平台期建議
+/// 文字 API 調用 (改讀 chatAnywhereKey)
 async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseFormatJson = false) {
-  const apiKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY; // 也可使用專用 ChatAnywhere Key 變數
-
+  const apiKey = chatAnywhereKey; // 讀取 ChatAnywhere 專用 Key
   if (!apiKey) {
-    showToast('⚠️ 請先設定 API Key！');
+    showToast('⚠️ 請先至「我的」分頁設定 ChatAnywhere Key！');
     throw new Error('MISSING_API_KEY');
   }
+  // ... 其餘保持不變 ...
+}
 
   const payload = {
     model: model || 'gpt-4o-mini',
