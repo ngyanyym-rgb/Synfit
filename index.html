@@ -5002,23 +5002,25 @@ function calculateTotalSessionVolume(sessionActions) {
     return total + actVolume;
   }, 0);
 }
-// ✅ 已安全移除硬編碼 Key，嚴格僅從用戶本地存儲讀取
+// ==========================================
+// 🤖 雙 API 請求核心函數 (修正語法錯誤版)
+// ==========================================
+
 const PRESET_SILICONFLOW_API_KEY = '';
+
 function extractJsonFromString(str) {
   if (!str) return '';
   const match = str.match(/\{[\s\S]*\}/);
   return match ? match[0] : str;
 }
 
-/// 文字 API 調用 (改讀 chatAnywhereKey)
+// 1️⃣ 文字 API 調用 (ChatAnywhere) -> 用於生成菜單與平台期建議
 async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseFormatJson = false) {
   const apiKey = chatAnywhereKey; // 讀取 ChatAnywhere 專用 Key
   if (!apiKey) {
     showToast('⚠️ 請先至「我的」分頁設定 ChatAnywhere Key！');
     throw new Error('MISSING_API_KEY');
   }
-  // ... 其餘保持不變 ...
-}
 
   const payload = {
     model: model || 'gpt-4o-mini',
