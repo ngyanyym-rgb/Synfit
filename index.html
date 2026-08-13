@@ -1654,9 +1654,11 @@
     const STORE_NAME = 'app_data';
     let dbInstance = null;
 
-    // Feature Flags & Settings
+   // Feature Flags & Settings
     let voiceCoachEnabled = true;
     let cloudSyncKey = '';
+    let chatAnywhereKey = '';
+    let geminiApiKey = ''; // 全域變數統一在此宣告即可
 
     // Firebase 專案配置 (如需雲端同步，請確保 Firebase Config 正確)
     const firebaseConfig = {
@@ -1724,12 +1726,6 @@
         setTimeout(() => { toast.classList.add('opacity-0', 'pointer-events-none'); }, 2200);
       }
     }
-
-// ==========================================
-// 🔑 雙 API Key 獨立全域變數與儲存邏輯
-// ==========================================
-let chatAnywhereKey = '';
-let geminiApiKey = '';
 
 // 儲存 ChatAnywhere Key
 async function saveChatAnywhereKey() {
@@ -5010,7 +5006,7 @@ function extractJsonFromString(str) {
 
 // 1️⃣ 文字 API 調用 (ChatAnywhere) -> 用於生成菜單與平台期建議
 async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseFormatJson = false) {
-  const apiKey = chatAnywhereKey; // 讀取 ChatAnywhere 專用 Key
+  const apiKey = chatAnywhereKey;
   if (!apiKey) {
     showToast('⚠️ 請先至「我的」分頁設定 ChatAnywhere Key！');
     throw new Error('MISSING_API_KEY');
