@@ -1657,7 +1657,6 @@
     // Feature Flags & Settings
     let voiceCoachEnabled = true;
     let cloudSyncKey = '';
-    let geminiApiKey = ''; // 新增 Gemini API Key 全域變數
 
     // Firebase 專案配置 (如需雲端同步，請確保 Firebase Config 正確)
     const firebaseConfig = {
@@ -2934,12 +2933,7 @@ function render1RMTrendChart() {
     `).join('')}
   `;
 }
-    
-// ✅ 修復：將核心功能初始化抽離至全域主幹，確保首次使用或未綁定雲端 Key 的使用者能正常啟動
-setupMidnightCheck();
-syncWgerExercises();
-renderWeeklyDietPlannerUI();
-// ✅ 升級版條碼查詢：Open Food Facts + AI 大模型雙保險備援
+
 // ✅ 2. 升級版條碼檢索 (含動態遮罩 + 絕對響應兜底機制)
 async function fetchOpenFoodFactsByBarcode(barcode) {
   const cleanBarcode = String(barcode || '').trim();
