@@ -1726,50 +1726,116 @@
       }
     }
 
-   // 全域變數定義
+// ==========================================
+// 🔑 雙 API Key 獨立全域變數與儲存邏輯
+// ==========================================
 let chatAnywhereKey = '';
 let geminiApiKey = '';
 
-// 1. 儲存 ChatAnywhere Key
-function saveChatAnywhereKey() {
+// 儲存 ChatAnywhere Key
+async function saveChatAnywhereKey() {
   const input = document.getElementById('chatanywhere-api-key-input');
   chatAnywhereKey = input ? input.value.trim() : '';
   if (chatAnywhereKey) {
-    dbSetItem('synfit_chatanywhere_api_key', chatAnywhereKey);
+    await dbSetItem('synfit_chatanywhere_api_key', chatAnywhereKey);
     showToast('✅ ChatAnywhere Key 已成功儲存！');
   } else {
-    showToast('請輸入有效的 ChatAnywhere Key');
+    showToast('⚠️ 請輸入有效的 ChatAnywhere Key');
   }
 }
 
-// 2. 儲存 Google Gemini Key
-function saveGeminiApiKey() {
+// 儲存 Google Gemini Key
+async function saveGeminiApiKey() {
   const input = document.getElementById('gemini-api-key-input');
   geminiApiKey = input ? input.value.trim() : '';
   if (geminiApiKey) {
-    dbSetItem('synfit_gemini_api_key', geminiApiKey);
+    await dbSetItem('synfit_gemini_api_key', geminiApiKey);
     showToast('✅ Google Gemini Key 已成功儲存！');
   } else {
-    showToast('請輸入有效的 Gemini Key');
+    showToast('⚠️ 請輸入有效的 Gemini Key');
   }
 }
 
-// 3. 在 window.onload 中自動載入已儲存的雙 Key
-window.addEventListener('load', async () => {
-  const savedChatKey = await dbGetItem('synfit_chatanywhere_api_key');
-  if (savedChatKey) {
-    chatAnywhereKey = savedChatKey;
-    const input = document.getElementById('chatanywhere-api-key-input');
-    if (input) input.value = chatAnywhereKey;
-  }
+// ==========================================
+// 🚀 統一的小程序主程序入口 (獨占單一啟動點)
+// ==========================================
+window.onload = async function() {
+  try {
+    // 1. 初始化本地 IndexedDB 資料庫
+    await initIndexedDB();
 
-  const savedGeminiKey = await dbGetItem('synfit_gemini_api_key');
-  if (savedGeminiKey) {
-    geminiApiKey = savedGeminiKey;
-    const input = document.getElementById('gemini-api-key-input');
-    if (input) input.value = geminiApiKey;
+    // 2. 讀取語音教練設定
+    const savedVoiceCoach = await dbGetItem('synfit_voice_coach');
+    if (savedVoiceCoach !== null) voiceCoachEnabled = savedVoiceCoach;
+    const toggle = document.getElementById('voice-coach-toggle');
+    if (toggle) toggle.checked = voiceCoachEnabled;
+
+    // 3. 讀取雲端同步 Key
+    const savedCloudKey = await dbGetItem('synfit_cloud_key');
+    if (savedCloudKey) {
+      cloudSyncKey = savedCloudKey;
+      const keyInput = document.getElementById('cloud-sync-key-input');
+      if (keyInput) keyInput.value = cloudSyncKey;
+      updateCloudSyncBadge('已綁定', 'bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+    }
+
+    // 4. 讀取雙 API Key (ChatAnywhere & Google Gemini)
+    const savedChatKey = await dbGetItem('synfit_chatanywhere_api_key');
+    if (savedChatKey) {
+      chatAnywhereKey = savedChatKey;
+      const cInput = document.getElementById('chatanywhere-api-key-input');
+      if (cInput) cInput.value = chatAnywhereKey;
+    }
+
+    const savedGeminiKey = await dbGetItem('synfit_gemini_api_key');
+    if (savedGeminiKey) {
+      geminiApiKey = savedGeminiKey;
+      const gInput = document.getElementById('gemini-api-key-input');
+      if (gInput) gInput.value = geminiApiKey;
+    }
+
+    // 5. 日期與系統狀態對齊
+    const now = new Date();
+    currentSystemTodayStr = getFormattedDateStr(now);
+    historyState.currentYear = now.getFullYear();
+    historyState.currentMonth = now.getMonth();
+    historyState.selectedDateStr = currentSystemTodayStr;
+
+    // 6. 載入使用者資料與歷史紀錄
+    await loadUserProfile();
+    updateTodayDateDisplay();
+    await checkDailyReset();
+    await loadAlbumFromStorage();
+    await loadHistoryFromStorage();
+    initHistoryYearMonthDropdowns();
+    
+    // 7. 前端 UI 組件初始化渲染
+    renderActionList();
+    renderQuickActionSelector();
+    renderFoodPickerList();
+    renderTemplateList();
+    
+    updateRealCheckInStreak();
+    renderAlbumGrid();
+    updateDietUI();
+    
+    renderHistoryCalendar();
+    renderHistoryDateDetail(historyState.selectedDateStr);
+
+    calculateHealthProfile();
+    evaluateAchievements();
+    renderWeeklyPartVolumeBars();
+    render1RMTrendChart();
+
+    // 8. 背景維護任務
+    setupMidnightCheck();
+    syncWgerExercises();
+    renderWeeklyDietPlannerUI();
+
+  } catch (err) {
+    console.error("SynFit 初始化載入異常 (已自動防護):", err);
   }
-});
+};
 
     function speakVoicePrompt(text) {
       if (!voiceCoachEnabled || !('speechSynthesis' in window)) return;
@@ -2868,23 +2934,7 @@ function render1RMTrendChart() {
     `).join('')}
   `;
 }
-
-    window.onload = async function() {
-      await initIndexedDB();
-
-      const savedVoiceCoach = await dbGetItem('synfit_voice_coach');
-      if (savedVoiceCoach !== null) voiceCoachEnabled = savedVoiceCoach;
-      const toggle = document.getElementById('voice-coach-toggle');
-      if (toggle) toggle.checked = voiceCoachEnabled;
-
-      const savedCloudKey = await dbGetItem('synfit_cloud_key');
-if (savedCloudKey) {
-  cloudSyncKey = savedCloudKey;
-  const keyInput = document.getElementById('cloud-sync-key-input');
-  if (keyInput) keyInput.value = cloudSyncKey;
-  updateCloudSyncBadge('已綁定', 'bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
-}
-
+    
 // ✅ 修復：將核心功能初始化抽離至全域主幹，確保首次使用或未綁定雲端 Key 的使用者能正常啟動
 setupMidnightCheck();
 syncWgerExercises();
@@ -2984,45 +3034,6 @@ async function fetchOpenFoodFactsByBarcode(barcode) {
     return fallbackFood;
   }
 }      
-      const savedGeminiKey = await dbGetItem('synfit_gemini_api_key');
-      if (savedGeminiKey) {
-        geminiApiKey = savedGeminiKey;
-        const gKeyInput = document.getElementById('gemini-api-key-input');
-        if (gKeyInput) gKeyInput.value = geminiApiKey;
-      }
-
-      const now = new Date();
-      currentSystemTodayStr = getFormattedDateStr(now);
-      historyState.currentYear = now.getFullYear();
-      historyState.currentMonth = now.getMonth();
-      historyState.selectedDateStr = currentSystemTodayStr;
-
-      await loadUserProfile();
-      updateTodayDateDisplay();
-      await checkDailyReset();
-      await loadAlbumFromStorage();
-      await loadHistoryFromStorage();
-      initHistoryYearMonthDropdowns();
-      
-      renderActionList();
-      renderQuickActionSelector();
-      renderFoodPickerList();
-      renderTemplateList();
-      
-      updateRealCheckInStreak();
-      renderAlbumGrid();
-      updateDietUI();
-      
-      renderHistoryCalendar();
-      renderHistoryDateDetail(historyState.selectedDateStr);
-
-      calculateHealthProfile();
-      evaluateAchievements();
-      renderWeeklyPartVolumeBars();
-      render1RMTrendChart();
-
-      setupMidnightCheck();
-    };
 
     function startRestTimer(seconds) {
       restTimeTotalSeconds = seconds; restTimeRemaining = seconds;
