@@ -11,6 +11,8 @@
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- ZXing 本地條碼解析庫 CDN -->
+<script src="https://unpkg.com/@zxing/library@latest"></script>
   
   <!-- Firebase Compatibility JS SDKs for Cloud Sync -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -3297,7 +3299,42 @@ async function fetchOpenFoodFactsByBarcode(barcode) {
         reader.readAsDataURL(file);
       });
     }
-
+// ✅ 新增：AI Vision 專用極致圖片壓縮流水線 (控制在 30KB 內，防止 API 拒收)
+function compressImageForVision(file, maxDimension = 400, quality = 0.5) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('讀取圖片檔案失敗'));
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onerror = () => reject(new Error('圖片解碼失敗'));
+      img.onload = function() {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        // 匯出低品質 JPG，極致縮小 Base64 體積
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+    
     async function loadUserProfile() {
       const raw = await dbGetItem('synfit_user_profile');
       if (raw) userProfile = { ...userProfile, ...raw };
@@ -4541,21 +4578,27 @@ function calculate1RM(weight, reps) {
 
     function triggerAIFoodPhotoUpload() { document.getElementById('ai-food-file-input').click(); }
 
-    async function handleAIFoodPhotoSelect(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+    // ✅ 更新相片選擇處理：改用超輕量壓縮
+async function handleAIFoodPhotoSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
 
-      try {
-        const compressed = await compressImage(file, 800, 0.8);
-        currentAIFoodPhotoBase64 = compressed;
+  try {
+    showToast('📸 圖片處理中...');
+    // 使用專用壓縮，將圖片縮小至 400px
+    const compressed = await compressImageForVision(file, 400, 0.5);
+    currentAIFoodPhotoBase64 = compressed;
 
-        const imgEl = document.getElementById('ai-preview-img');
-        imgEl.src = currentAIFoodPhotoBase64; imgEl.classList.remove('hidden');
-        document.getElementById('ai-preview-placeholder').classList.add('hidden');
+    const imgEl = document.getElementById('ai-preview-img');
+    imgEl.src = currentAIFoodPhotoBase64;
+    imgEl.classList.remove('hidden');
+    document.getElementById('ai-preview-placeholder').classList.add('hidden');
 
-        startRealAIFoodAnalysis();
-      } catch (err) { showToast('相片載入失敗，請重新拍攝！'); }
-    }
+    startRealAIFoodAnalysis();
+  } catch (err) {
+    showToast('相片載入失敗，請重新拍攝！');
+  }
+}
 
     async function callGeminiVisionWithBackoff(apiUrl, payload, maxRetries = 3) {
       let delay = 1000;
@@ -4574,9 +4617,7 @@ function calculate1RM(weight, reps) {
       throw new Error('API_FETCH_FAILED');
     }
 
-   // ✅ 升級版 AI 與條碼分析函數 (支援雙模式)
-// ✅ 3. 食物相機視覺辨識 (gpt-4o-mini 支援原生 Vision 圖片傳遞)
-// ✅ 升級版 AI 視覺與條碼雙模態解析 (自動調用相機)
+  // ✅ 升級版：ZXing 本地條碼解碼 + AI 極致壓縮辨識
 async function startRealAIFoodAnalysis() {
   const effectiveKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY;
   if (!effectiveKey) {
@@ -4584,8 +4625,8 @@ async function startRealAIFoodAnalysis() {
     return;
   }
   if (!currentAIFoodPhotoBase64) {
-    showToast('請先拍攝實體或條碼照片！');
-    triggerAIFoodPhotoUpload(); // 這裡會自動開啟手機鏡頭
+    showToast('請先拍攝實物或條碼照片！');
+    triggerAIFoodPhotoUpload();
     return;
   }
 
@@ -4598,68 +4639,103 @@ async function startRealAIFoodAnalysis() {
 
   try {
     if (currentScanMode === 'barcode') {
-      if (titleEl) titleEl.textContent = "相機掃描條碼中...";
-      if (descEl) descEl.textContent = "正在透過鏡頭解析圖片中的條碼或營養成分數據...";
-      
-      // 第一步：優先嘗試瀏覽器原生條碼 API (速度最快)
+      if (titleEl) titleEl.textContent = "條碼掃描辨識中...";
+      if (descEl) descEl.textContent = "正在透過本地 ZXing 引擎精準解碼條碼...";
+
       let detectedBarcode = null;
-      if ('BarcodeDetector' in window) {
-        try {
-          const img = document.getElementById('ai-preview-img');
-          const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'] });
-          const barcodes = await barcodeDetector.detect(img);
-          if (barcodes.length > 0) detectedBarcode = barcodes[0].rawValue;
-        } catch (e) { console.warn('原生 Barcode API 無法辨識:', e); }
+
+      // 第一步：使用 ZXing 庫進行本地影像條碼解碼
+      try {
+        if (window.ZXing) {
+          const codeReader = new ZXing.BrowserMultiFormatReader();
+          const imgEl = document.getElementById('ai-preview-img');
+          const result = await codeReader.decodeFromImageElement(imgEl);
+          if (result && result.text) {
+            detectedBarcode = result.text.trim();
+          }
+        }
+      } catch (zxingErr) {
+        console.warn("ZXing 本地解碼未辨識出標準條碼，準備啟動 AI 視覺備援:", zxingErr);
       }
 
-      // 成功解析條碼數字，拋給 Open Food Facts API
+      // 若順利讀取到條碼號碼，向 Open Food Facts 數據庫查詢
       if (detectedBarcode) {
-        if (descEl) descEl.textContent = `掃描成功！條碼 [${detectedBarcode}]，檢索資料庫中...`;
-        await fetchOpenFoodFactsByBarcode(detectedBarcode);
+        if (descEl) descEl.textContent = `解碼成功 [${detectedBarcode}]！查詢營養資料庫中...`;
+        const foodData = await fetchOpenFoodFactsByBarcode(detectedBarcode);
         if (overlay) overlay.classList.add('hidden');
-        return; 
+        if (foodData) return;
       }
 
-      // 第二步：原生掃不到 (例如拍到背面營養表)，啟動 AI 視覺大模型強力解析
-      if (descEl) descEl.textContent = "啟動 AI 深度識別包裝營養表...";
+      // 第二步：如果 ZXing 沒掃出數字（如拍到營養表），啟動 AI 大模型深度識別
+      if (descEl) descEl.textContent = "啟動 AI 視覺讀取包裝營養標籤...";
       const promptText = "這是一張食品包裝的條碼或背面營養成分表。請透過視覺讀取數據並回覆合法 JSON，格式為：{\"foodName\":\"食品名稱(或品牌)\",\"portion\":\"100g或1份\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":0,\"emoji\":\"📦\",\"confidence\":90}";
-      const messages = [ { role: "user", content: [ { type: "text", text: promptText }, { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } } ] } ];
       
+      const messages = [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: promptText },
+            { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } }
+          ]
+        }
+      ];
+
       const responseText = await callSiliconFlowApi(messages, "gpt-4o-mini", true);
       const parsed = JSON.parse(extractJsonFromString(responseText));
-      
+
       currentAIFoodResult = parsed;
       displayAIFoodResult(parsed);
-      showToast('✅ 標籤包裝辨識完成！');
-      
+      showToast('✅ 包裝營養成分辨識成功！');
+
     } else {
       // 食物實體拍照模式
       if (titleEl) titleEl.textContent = "AI 視覺辨識中...";
-      if (descEl) descEl.textContent = "正在透過 AI 精準分析照片中實物的熱量與三大營養素...";
-      
+      if (descEl) descEl.textContent = "正在分析圖片中實物的熱量與三大營養素...";
+
       const promptText = "請精準識別圖片中的食物，必須回覆合法 JSON，格式為：{\"foodName\":\"繁體中文名稱\",\"portion\":\"份量估算\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":水分數字,\"emoji\":\"適當Emoji\",\"confidence\":95}";
-      const messages = [ { role: "user", content: [ { type: "text", text: promptText }, { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } } ] } ];
       
+      const messages = [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: promptText },
+            { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } }
+          ]
+        }
+      ];
+
       const responseText = await callSiliconFlowApi(messages, "gpt-4o-mini", true);
       const parsed = JSON.parse(extractJsonFromString(responseText));
-      
+
       currentAIFoodResult = parsed;
       displayAIFoodResult(parsed);
-      showToast('✅ AI 食物視覺辨識完成！');
+      showToast('✅ AI 食物辨識成功！');
     }
   } catch (err) {
-    console.error("AI 辨識錯誤:", err);
-    // 降級處理：即使網絡失敗，也強制彈出卡片讓你能手動填寫，絕對不會沒反應
+    console.error("AI 辨識詳細錯誤:", err);
+    // 顯示明確的錯誤原因，方便調試
+    const errorMsg = err.message || '網絡請求超時';
+    showToast(`❌ 辨識失敗: ${errorMsg}`);
+    
+    // 降級跳出可編輯卡片
     const fallbackFood = {
-      foodName: currentScanMode === 'barcode' ? "條碼商品(請修正)" : "未知食物(請修正)",
-      portion: "1份", calories: 200, carbs: 20, protein: 10, fat: 5, water: 0, emoji: currentScanMode === 'barcode' ? "📦" : "❓", confidence: 50
+      foodName: currentScanMode === 'barcode' ? "條碼商品 (請手動修正)" : "未知食物 (請手動修正)",
+      portion: "1份",
+      calories: 200,
+      carbs: 20,
+      protein: 10,
+      fat: 5,
+      water: 0,
+      emoji: currentScanMode === 'barcode' ? "📦" : "❓",
+      confidence: 50
     };
     displayAIFoodResult(fallbackFood);
-    showToast(`⚠️ 自動辨識失敗，已開啟卡片供您手動修正`);
   } finally {
     if (overlay) overlay.classList.add('hidden');
   }
-}    function displayAIFoodResult(data) {
+}
+    
+     function displayAIFoodResult(data) {
       document.getElementById('ai-res-emoji').textContent = data.emoji || '🍱';
       document.getElementById('ai-res-name-input').value = data.foodName || '未知食物';
       document.getElementById('ai-res-portion-input').value = data.portion || '1份 (約200g)';
