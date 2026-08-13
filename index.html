@@ -4617,11 +4617,11 @@ async function handleAIFoodPhotoSelect(e) {
       throw new Error('API_FETCH_FAILED');
     }
 
-  // ✅ 升級版：ZXing 本地條碼解碼 + AI 極致壓縮辨識
+  // ✅ 升級版：ZXing 本地條碼解碼 + Google Gemini Vision 拍照辨識
 async function startRealAIFoodAnalysis() {
   const effectiveKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY;
   if (!effectiveKey) {
-    showToast('⚠️ 請先至「我的」分頁設定您的 API Key！');
+    showToast('⚠️ 請先至「我的」分頁設定您的 Gemini API Key！');
     return;
   }
   if (!currentAIFoodPhotoBase64) {
@@ -4644,7 +4644,7 @@ async function startRealAIFoodAnalysis() {
 
       let detectedBarcode = null;
 
-      // 第一步：使用 ZXing 庫進行本地影像條碼解碼
+      // 第一步：使用 ZXing 進行本地影像條碼解碼
       try {
         if (window.ZXing) {
           const codeReader = new ZXing.BrowserMultiFormatReader();
@@ -4655,10 +4655,10 @@ async function startRealAIFoodAnalysis() {
           }
         }
       } catch (zxingErr) {
-        console.warn("ZXing 本地解碼未辨識出標準條碼，準備啟動 AI 視覺備援:", zxingErr);
+        console.warn("ZXing 本地未檢測出標準條碼，準備啟動 Gemini 視覺備援:", zxingErr);
       }
 
-      // 若順利讀取到條碼號碼，向 Open Food Facts 數據庫查詢
+      // 若解碼成功，查詢 Open Food Facts 資料庫
       if (detectedBarcode) {
         if (descEl) descEl.textContent = `解碼成功 [${detectedBarcode}]！查詢營養資料庫中...`;
         const foodData = await fetchOpenFoodFactsByBarcode(detectedBarcode);
@@ -4666,21 +4666,11 @@ async function startRealAIFoodAnalysis() {
         if (foodData) return;
       }
 
-      // 第二步：如果 ZXing 沒掃出數字（如拍到營養表），啟動 AI 大模型深度識別
-      if (descEl) descEl.textContent = "啟動 AI 視覺讀取包裝營養標籤...";
+      // 第二步：條碼資料庫無記錄或未掃出，啟動 Gemini 視覺模型讀取包裝標籤
+      if (descEl) descEl.textContent = "啟動 Gemini AI 視覺讀取包裝營養標籤...";
       const promptText = "這是一張食品包裝的條碼或背面營養成分表。請透過視覺讀取數據並回覆合法 JSON，格式為：{\"foodName\":\"食品名稱(或品牌)\",\"portion\":\"100g或1份\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":0,\"emoji\":\"📦\",\"confidence\":90}";
       
-      const messages = [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: promptText },
-            { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } }
-          ]
-        }
-      ];
-
-      const responseText = await callSiliconFlowApi(messages, "gpt-4o-mini", true);
+      const responseText = await callGeminiNativeApi(promptText, currentAIFoodPhotoBase64);
       const parsed = JSON.parse(extractJsonFromString(responseText));
 
       currentAIFoodResult = parsed;
@@ -4689,35 +4679,24 @@ async function startRealAIFoodAnalysis() {
 
     } else {
       // 食物實體拍照模式
-      if (titleEl) titleEl.textContent = "AI 視覺辨識中...";
+      if (titleEl) titleEl.textContent = "Gemini AI 視覺辨識中...";
       if (descEl) descEl.textContent = "正在分析圖片中實物的熱量與三大營養素...";
 
       const promptText = "請精準識別圖片中的食物，必須回覆合法 JSON，格式為：{\"foodName\":\"繁體中文名稱\",\"portion\":\"份量估算\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":水分數字,\"emoji\":\"適當Emoji\",\"confidence\":95}";
       
-      const messages = [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: promptText },
-            { type: "image_url", image_url: { url: currentAIFoodPhotoBase64 } }
-          ]
-        }
-      ];
-
-      const responseText = await callSiliconFlowApi(messages, "gpt-4o-mini", true);
+      const responseText = await callGeminiNativeApi(promptText, currentAIFoodPhotoBase64);
       const parsed = JSON.parse(extractJsonFromString(responseText));
 
       currentAIFoodResult = parsed;
       displayAIFoodResult(parsed);
-      showToast('✅ AI 食物辨識成功！');
+      showToast('✅ Gemini AI 食物辨識成功！');
     }
   } catch (err) {
-    console.error("AI 辨識詳細錯誤:", err);
-    // 顯示明確的錯誤原因，方便調試
+    console.error("Gemini 辨識詳細錯誤:", err);
     const errorMsg = err.message || '網絡請求超時';
     showToast(`❌ 辨識失敗: ${errorMsg}`);
     
-    // 降級跳出可編輯卡片
+    // 降級跳出手動編輯卡片
     const fallbackFood = {
       foodName: currentScanMode === 'barcode' ? "條碼商品 (請手動修正)" : "未知食物 (請手動修正)",
       portion: "1份",
@@ -4973,12 +4952,12 @@ function extractJsonFromString(str) {
   return match ? match[0] : str;
 }
 
-// ✅ 1. 轉接至 ChatAnywhere API (支援 GPT-4o-mini 文字與視覺識別)
+// 1️⃣ 文字專用 API 函數 (ChatAnywhere) -> 用於生成菜單與平台期建議
 async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseFormatJson = false) {
-  const apiKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY;
+  const apiKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY; // 也可使用專用 ChatAnywhere Key 變數
 
   if (!apiKey) {
-    showToast('⚠️ 請先至「我的」頁面設定您的 ChatAnywhere API Key (sk-...)！');
+    showToast('⚠️ 請先設定 API Key！');
     throw new Error('MISSING_API_KEY');
   }
 
@@ -4988,13 +4967,11 @@ async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseForma
     stream: false
   };
 
-  // ChatAnywhere 完全相容 OpenAI 的 json_object 模式
   if (responseFormatJson) {
     payload.response_format = { type: "json_object" };
   }
 
-  // 更換為 ChatAnywhere 的標準 API 接口 (亦可使用 https://api.chatanywhere.tech/v1/chat/completions)
-  const res = await fetch("https://api.chatanywhere.org/v1/chat/completions", {
+  const res = await fetch("https://api.chatanywhere.tech/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
@@ -5005,12 +4982,55 @@ async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseForma
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
-    console.error("ChatAnywhere API 錯誤詳情:", errData);
     throw new Error(errData.error?.message || `HTTP_${res.status}`);
   }
 
   const data = await res.json();
   return data.choices?.[0]?.message?.content;
+}
+
+// 2️⃣ 圖片視覺專用 API 函數 (Google Gemini) -> 僅用於食物拍照與包裝辨識
+async function callGeminiNativeApi(promptText, base64ImageUrl = null) {
+  const apiKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY;
+
+  if (!apiKey) {
+    showToast('⚠️ 請先至「我的」分頁設定 Gemini API Key！');
+    throw new Error('MISSING_API_KEY');
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const parts = [{ text: promptText }];
+
+  if (base64ImageUrl) {
+    const pureBase64 = base64ImageUrl.replace(/^data:image\/\w+;base64,/, '');
+    parts.push({
+      inline_data: {
+        mime_type: "image/jpeg",
+        data: pureBase64
+      }
+    });
+  }
+
+  const payload = {
+    contents: [{ parts: parts }],
+    generationConfig: {
+      response_mime_type: "application/json"
+    }
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `HTTP_${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text;
 }
 // ✅ Diet-Planner 7天智慧碳水循環分配器
 function generateWeeklyDietPlan(tdee, bmr, weight, strategy = 'balanced') {
