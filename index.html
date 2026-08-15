@@ -4665,11 +4665,11 @@ async function handleAIFoodPhotoSelect(e) {
       throw new Error('API_FETCH_FAILED');
     }
 
-  // ✅ 升級版：ZXing 本地條碼解碼 + Google Gemini Vision 拍照辨識
+// ✅ 修正版：使用 OpenRouter Key 進行食物與條碼 AI 分析
 async function startRealAIFoodAnalysis() {
-  const effectiveKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY;
+  const effectiveKey = openrouterApiKey || chatAnywhereKey;
   if (!effectiveKey) {
-    showToast('⚠️ 請先至「我的」分頁設定您的 Gemini API Key！');
+    showToast('⚠️ 請先至「我的」分頁設定您的 OpenRouter Key！');
     return;
   }
   if (!currentAIFoodPhotoBase64) {
@@ -4703,7 +4703,7 @@ async function startRealAIFoodAnalysis() {
           }
         }
       } catch (zxingErr) {
-        console.warn("ZXing 本地未檢測出標準條碼，準備啟動 Gemini 視覺備援:", zxingErr);
+        console.warn("ZXing 本地未檢測出標準條碼，準備啟動 AI 視覺備援:", zxingErr);
       }
 
       // 若解碼成功，查詢 Open Food Facts 資料庫
@@ -4714,12 +4714,12 @@ async function startRealAIFoodAnalysis() {
         if (foodData) return;
       }
 
-      // 第二步：條碼資料庫無記錄或未掃出，啟動 Gemini 視覺模型讀取包裝標籤
-      if (descEl) descEl.textContent = "啟動 Gemini AI 視覺讀取包裝營養標籤...";
+      // 第二步：條碼資料庫無記錄或未掃出，啟動 OpenRouter 視覺模型讀取包裝標籤
+      if (descEl) descEl.textContent = "啟動 OpenRouter AI 視覺讀取包裝營養標籤...";
       const promptText = "這是一張食品包裝的條碼或背面營養成分表。請透過視覺讀取數據並回覆合法 JSON，格式為：{\"foodName\":\"食品名稱(或品牌)\",\"portion\":\"100g或1份\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":0,\"emoji\":\"📦\",\"confidence\":90}";
       
-     const responseText = await callOpenRouterVisionApi(promptText, currentAIFoodPhotoBase64);
-const parsed = JSON.parse(extractJsonFromString(responseText));
+      const responseText = await callOpenRouterVisionApi(promptText, currentAIFoodPhotoBase64);
+      const parsed = JSON.parse(extractJsonFromString(responseText));
 
       currentAIFoodResult = parsed;
       displayAIFoodResult(parsed);
@@ -4727,20 +4727,20 @@ const parsed = JSON.parse(extractJsonFromString(responseText));
 
     } else {
       // 食物實體拍照模式
-      if (titleEl) titleEl.textContent = "Gemini AI 視覺辨識中...";
+      if (titleEl) titleEl.textContent = "OpenRouter AI 視覺辨識中...";
       if (descEl) descEl.textContent = "正在分析圖片中實物的熱量與三大營養素...";
 
       const promptText = "請精準識別圖片中的食物，必須回覆合法 JSON，格式為：{\"foodName\":\"繁體中文名稱\",\"portion\":\"份量估算\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":水分數字,\"emoji\":\"適當Emoji\",\"confidence\":95}";
       
       const responseText = await callOpenRouterVisionApi(promptText, currentAIFoodPhotoBase64);
-const parsed = JSON.parse(extractJsonFromString(responseText));
+      const parsed = JSON.parse(extractJsonFromString(responseText));
 
       currentAIFoodResult = parsed;
       displayAIFoodResult(parsed);
-      showToast('✅ Gemini AI 食物辨識成功！');
+      showToast('✅ OpenRouter AI 食物辨識成功！');
     }
   } catch (err) {
-    console.error("Gemini 辨識詳細錯誤:", err);
+    console.error("OpenRouter 辨識詳細錯誤:", err);
     const errorMsg = err.message || '網絡請求超時';
     showToast(`❌ 辨識失敗: ${errorMsg}`);
     
