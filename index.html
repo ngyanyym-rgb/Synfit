@@ -715,12 +715,12 @@
     </div>
   </div>
 
- <!-- 2. OpenRouter Key (食物拍照/條碼) -->
+<!-- 2. SambaNova Key (食物拍照/條碼) -->
 <div class="space-y-1 pt-1">
-  <label class="text-[10px] font-bold theme-text-primary block">📸 OpenRouter Key (食物拍照辨識/條碼)</label>
+  <label class="text-[10px] font-bold theme-text-primary block">📸 SambaNova Key (免費食物拍照辨識/條碼)</label>
   <div class="flex gap-2">
-    <input id="openrouter-api-key-input" type="password" placeholder="輸入 sk-or-v1-... Key" class="flex-1 card-bg-sub border border-main rounded-xl px-3 py-2 text-xs text-main focus:outline-none border-theme-primary font-mono">
-    <button onclick="saveOpenRouterApiKey()" class="px-3 py-2 card-bg-sub border border-main text-xs font-bold rounded-xl text-sub hover:text-main">儲存</button>
+    <input id="sambanova-api-key-input" type="password" placeholder="輸入 SambaNova Key" class="flex-1 card-bg-sub border border-main rounded-xl px-3 py-2 text-xs text-main focus:outline-none border-theme-primary font-mono">
+    <button onclick="saveSambaNovaApiKey()" class="px-3 py-2 card-bg-sub border border-main text-xs font-bold rounded-xl text-sub hover:text-main">儲存</button>
   </div>
 </div>
 
@@ -1657,7 +1657,7 @@
     let voiceCoachEnabled = true;
     let cloudSyncKey = '';
     let chatAnywhereKey = '';
-    let openrouterApiKey = '';
+    let sambanovaApiKey = '';
 
     // Firebase 專案配置 (如需雲端同步，請確保 Firebase Config 正確)
     const firebaseConfig = {
@@ -1726,28 +1726,27 @@
       }
     }
 
-// 儲存 ChatAnywhere Key
-async function saveChatAnywhereKey() {
-  const input = document.getElementById('chatanywhere-api-key-input');
-  chatAnywhereKey = input ? input.value.trim() : '';
-  if (chatAnywhereKey) {
-    await dbSetItem('synfit_chatanywhere_api_key', chatAnywhereKey);
-    showToast('✅ ChatAnywhere Key 已成功儲存！');
+// 儲存 SambaNova Key
+async function saveSambaNovaApiKey() {
+  const input = document.getElementById('sambanova-api-key-input');
+  sambanovaApiKey = input ? input.value.trim() : '';
+  if (sambanovaApiKey) {
+    await dbSetItem('synfit_sambanova_api_key', sambanovaApiKey);
+    showToast('✅ SambaNova Key 已成功儲存！');
   } else {
-    showToast('⚠️ 請輸入有效的 ChatAnywhere Key');
+    showToast('⚠️ 請輸入有效的 SambaNova Key');
   }
 }
 
-
-// 儲存 OpenRouter Key
-async function saveOpenRouterApiKey() {
-  const input = document.getElementById('openrouter-api-key-input');
-  openrouterApiKey = input ? input.value.trim() : '';
-  if (openrouterApiKey) {
-    await dbSetItem('synfit_openrouter_api_key', openrouterApiKey);
-    showToast('✅ OpenRouter Key 已成功儲存！');
+// 儲存 GitHub Token
+async function saveGithubApiKey() {
+  const input = document.getElementById('github-api-key-input');
+  githubApiKey = input ? input.value.trim() : '';
+  if (githubApiKey) {
+    await dbSetItem('synfit_github_api_key', githubApiKey);
+    showToast('✅ GitHub Token 已成功儲存！');
   } else {
-    showToast('⚠️ 請輸入有效的 OpenRouter Key');
+    showToast('⚠️ 請輸入有效的 GitHub Token');
   }
 }
 
@@ -1782,11 +1781,11 @@ window.onload = async function() {
       if (cInput) cInput.value = chatAnywhereKey;
     }
 
-   const savedOpenRouterKey = await dbGetItem('synfit_openrouter_api_key');
-if (savedOpenRouterKey) {
-  openrouterApiKey = savedOpenRouterKey;
-  const oInput = document.getElementById('openrouter-api-key-input');
-  if (oInput) oInput.value = openrouterApiKey;
+ const savedSambaNovaKey = await dbGetItem('synfit_sambanova_api_key');
+if (savedSambaNovaKey) {
+  sambanovaApiKey = savedSambaNovaKey;
+  const sInput = document.getElementById('sambanova-api-key-input');
+  if (sInput) sInput.value = sambanovaApiKey;
 }
 
     // 5. 日期與系統狀態對齊
@@ -4667,9 +4666,9 @@ async function handleAIFoodPhotoSelect(e) {
 
 // ✅ 修正版：使用 OpenRouter Key 進行食物與條碼 AI 分析
 async function startRealAIFoodAnalysis() {
-  const effectiveKey = openrouterApiKey || chatAnywhereKey;
+ const effectiveKey = sambanovaApiKey || chatAnywhereKey;
   if (!effectiveKey) {
-    showToast('⚠️ 請先至「我的」分頁設定您的 OpenRouter Key！');
+    showToast('⚠️ 請先至「我的」分頁設定您的 Github Key！');
     return;
   }
   if (!currentAIFoodPhotoBase64) {
@@ -4718,7 +4717,7 @@ async function startRealAIFoodAnalysis() {
       if (descEl) descEl.textContent = "啟動 OpenRouter AI 視覺讀取包裝營養標籤...";
       const promptText = "這是一張食品包裝的條碼或背面營養成分表。請透過視覺讀取數據並回覆合法 JSON，格式為：{\"foodName\":\"食品名稱(或品牌)\",\"portion\":\"100g或1份\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":0,\"emoji\":\"📦\",\"confidence\":90}";
       
-      const responseText = await callOpenRouterVisionApi(promptText, currentAIFoodPhotoBase64);
+      const responseText = await callSambaNovaVisionApi(promptText, currentAIFoodPhotoBase64);
       const parsed = JSON.parse(extractJsonFromString(responseText));
 
       currentAIFoodResult = parsed;
@@ -4732,7 +4731,7 @@ async function startRealAIFoodAnalysis() {
 
       const promptText = "請精準識別圖片中的食物，必須回覆合法 JSON，格式為：{\"foodName\":\"繁體中文名稱\",\"portion\":\"份量估算\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":水分數字,\"emoji\":\"適當Emoji\",\"confidence\":95}";
       
-      const responseText = await callOpenRouterVisionApi(promptText, currentAIFoodPhotoBase64);
+      const responseText = await callSambaNovaVisionApi(promptText, currentAIFoodPhotoBase64);
       const parsed = JSON.parse(extractJsonFromString(responseText));
 
       currentAIFoodResult = parsed;
@@ -5000,8 +4999,9 @@ const PRESET_SILICONFLOW_API_KEY = '';
 
 function extractJsonFromString(str) {
   if (!str) return '';
-  const match = str.match(/\{[\s\S]*\}/);
-  return match ? match[0] : str;
+  let clean = str.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const match = clean.match(/\{[\s\S]*\}/);
+  return match ? match[0] : clean;
 }
 
 // 1️⃣ 文字 API 調用 (ChatAnywhere) -> 用於生成菜單與平台期建議
@@ -5040,16 +5040,17 @@ async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseForma
   return data.choices?.[0]?.message?.content;
 }
 
-// 3️⃣ 圖片視覺 API 函數 (OpenRouter 免費模型)
-async function callOpenRouterVisionApi(promptText, base64ImageUrl = null) {
-  const apiKey = openrouterApiKey || chatAnywhereKey;
+// 3️⃣ 圖片視覺 API 函數 (SambaNova Cloud 視覺引擎)
+async function callSambaNovaVisionApi(promptText, base64ImageUrl = null) {
+ const apiKey = sambanovaApiKey || chatAnywhereKey;
 
   if (!apiKey) {
-    showToast('⚠️ 請先至「我的」分頁設定 OpenRouter Key！');
+    showToast('⚠️ 請先至「我的」分頁設定 SambaNova Key！');
     throw new Error('MISSING_API_KEY');
   }
 
-  const messagesContent = [{ type: "text", text: promptText }];
+  const fullPrompt = promptText + "\n【重要指令】：請只回覆合法 JSON，嚴禁包含任何開場白說明或 Markdown 標籤。";
+  const messagesContent = [{ type: "text", text: fullPrompt }];
 
   if (base64ImageUrl) {
     messagesContent.push({
@@ -5058,23 +5059,21 @@ async function callOpenRouterVisionApi(promptText, base64ImageUrl = null) {
     });
   }
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const res = await fetch("https://api.sambanova.ai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": window.location.href,
-      "X-Title": "SynFit Fitness App"
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "qwen/qwen2.5-vl-72b-instruct:free", // OpenRouter 完全免費視覺模型
-      messages: [{ role: "user", content: messagesContent }],
-      response_format: { type: "json_object" }
+      model: "Llama-3.2-11B-Vision-Instruct",
+      messages: [{ role: "user", content: messagesContent }]
     })
   });
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
+    console.error("SambaNova API 錯誤詳情:", errData);
     throw new Error(errData.error?.message || `HTTP_${res.status}`);
   }
 
