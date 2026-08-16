@@ -3834,6 +3834,67 @@ function calculate1RM(weight, reps) {
       if (type === 'equip') currentEquipFilter = val;
       renderActionList();
     }
+// 💡 智能動作圖片匹配函數 (依據動作名稱關鍵字與部位精準分流)
+function getActionImage(item) {
+  // 如果使用者自己上傳了自訂動作圖片，優先使用
+  if (item.img && !item.img.includes('unsplash.com')) return item.img;
+
+  const name = item.name || '';
+  const part = item.part || '';
+
+  // 1. 胸部動作細分
+  if (part === '胸部') {
+    if (name.includes('臥推') || name.includes('推胸')) 
+      return 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=300&auto=format&fit=crop';
+    if (name.includes('飛鳥') || name.includes('夾胸')) 
+      return 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=300&auto=format&fit=crop';
+    if (name.includes('俯臥撐') || name.includes('雙槓')) 
+      return 'https://images.unsplash.com/photo-1598971639058-fab3c3109a00?w=300&auto=format&fit=crop';
+  }
+
+  // 2. 背部動作細分
+  if (part === '背部') {
+    if (name.includes('硬舉') || name.includes('RDL')) 
+      return 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=300&auto=format&fit=crop';
+    if (name.includes('划船') || name.includes('T桿')) 
+      return 'https://images.unsplash.com/photo-1605296867304-46d5465a13f1?w=300&auto=format&fit=crop';
+    if (name.includes('下拉') || name.includes('引體向上')) 
+      return 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=300&auto=format&fit=crop';
+    if (name.includes('聳肩')) 
+      return 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=300&auto=format&fit=crop';
+  }
+
+  // 3. 腿部動作細分
+  if (part === '腿部') {
+    if (name.includes('深蹲') || name.includes('哈克')) 
+      return 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=300&auto=format&fit=crop';
+    if (name.includes('倒蹬') || name.includes('腿伸展') || name.includes('腿彎舉')) 
+      return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&auto=format&fit=crop';
+    if (name.includes('弓步') || name.includes('保加利亞')) 
+      return 'https://images.unsplash.com/photo-1534367507873-d2d7e24c797f?w=300&auto=format&fit=crop';
+    if (name.includes('臀推') || name.includes('臀橋')) 
+      return 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=300&auto=format&fit=crop';
+  }
+
+  // 4. 肩部動作細分
+  if (part === '肩部') {
+    if (name.includes('推舉') || name.includes('肩推') || name.includes('阿諾德')) 
+      return 'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=300&auto=format&fit=crop';
+    if (name.includes('側平舉') || name.includes('前平舉') || name.includes('面拉')) 
+      return 'https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?w=300&auto=format&fit=crop';
+  }
+
+  // 5. 手臂動作細分
+  if (part === '手臂') {
+    if (name.includes('彎舉')) 
+      return 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=300&auto=format&fit=crop';
+    if (name.includes('下壓') || name.includes('臂屈伸') || name.includes('伸展')) 
+      return 'https://images.unsplash.com/photo-1530822847156-5df684611739?w=300&auto=format&fit=crop';
+  }
+
+  // 預設高畫質健身圖
+  return 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=300&auto=format&fit=crop';
+}
 
     function renderActionList() {
       const container = document.getElementById('action-list-render');
@@ -3853,7 +3914,7 @@ function calculate1RM(weight, reps) {
       container.innerHTML = filtered.map(item => `
         <div class="p-3 card-bg hover:opacity-90 rounded-2xl border border-main flex items-center justify-between transition-colors">
           <div class="flex items-center gap-3">
-            <img src="${item.img}" class="w-12 h-12 rounded-xl object-cover card-bg-sub border border-main" alt="${item.name}">
+           <img src="${getActionImage(item)}" class="w-12 h-12 rounded-xl object-cover card-bg-sub border border-main" alt="${item.name}">
             <div>
               <h4 class="text-xs font-bold text-main">${item.name}</h4>
               <div class="flex items-center gap-1.5 mt-1">
@@ -3913,7 +3974,7 @@ function calculate1RM(weight, reps) {
         return `
           <div class="p-3 card-bg rounded-2xl border ${isSelected ? 'theme-border-primary theme-bg-alpha' : 'border-main'} flex items-center justify-between transition-all">
             <div class="flex items-center gap-3">
-              <img src="${act.img}" class="w-10 h-10 rounded-xl object-cover card-bg-sub border border-main" alt="${act.name}">
+             <img src="${getActionImage(act)}" class="w-10 h-10 rounded-xl object-cover card-bg-sub border border-main" alt="${act.name}">
               <div>
                 <h4 class="text-xs font-bold text-main">${act.name}</h4>
                 <div class="flex gap-1.5 mt-0.5">
