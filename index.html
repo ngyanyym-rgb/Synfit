@@ -3122,12 +3122,12 @@ function renderActiveWorkoutSession() {
                 <h4 class="text-sm font-bold text-main">${act.name}</h4>
                 <p class="text-[10px] theme-text-primary font-mono mt-0.5">${historyText}</p>
               </div>
-              <div class="flex items-center gap-1.5">
-                <button onclick="openReplaceActionPicker(${act.id})" class="text-[11px] theme-text-primary font-bold px-2 py-1 theme-bg-alpha rounded-lg border theme-border-alpha hover:opacity-80">🔄 替換</button>
-                <button onclick="removeActionFromActiveSession(${act.id})" class="text-[11px] text-rose-400 font-bold px-2 py-1 bg-rose-500/10 rounded-lg border border-rose-500/20 hover:bg-rose-500/20">🗑️ 刪除</button>
-                <button onclick="addSetToSessionAction(${act.id})" class="text-[11px] theme-text-primary font-bold px-2 py-1 theme-bg-alpha rounded-lg border theme-border-alpha">+ 加一組</button>
-              </div>
-            </div>
+              <div class="flex items-center gap-1">
+  <button onclick="openReplaceActionPicker(${act.id})" class="text-[11px] theme-text-primary font-bold px-1.5 py-1 theme-bg-alpha rounded-lg border theme-border-alpha hover:opacity-80">🔄 替換</button>
+  <button onclick="removeActionFromActiveSession(${act.id})" class="text-[11px] text-rose-400 font-bold px-1.5 py-1 bg-rose-500/10 rounded-lg border border-rose-500/20 hover:bg-rose-500/20">🗑️ 刪除</button>
+  <button onclick="removeSetFromSessionAction(${act.id})" class="text-[11px] text-rose-400 font-bold px-1.5 py-1 bg-rose-500/10 rounded-lg border border-rose-500/20 hover:bg-rose-500/20">- 減組</button>
+  <button onclick="addSetToSessionAction(${act.id})" class="text-[11px] theme-text-primary font-bold px-1.5 py-1 theme-bg-alpha rounded-lg border theme-border-alpha">+ 加組</button>
+</div>
 
             <div class="space-y-2">
               <div class="grid grid-cols-7 gap-1 text-center text-[9px] text-sub font-bold uppercase">
@@ -3189,7 +3189,16 @@ function renderActiveWorkoutSession() {
       }
       renderActiveWorkoutSession();
     }
-
+// ➖ 訓練期間減少一組
+function removeSetFromSessionAction(actionId) {
+  const act = activeSessionActions.find(a => a.id === actionId);
+  if (act && act.sets && act.sets.length > 1) {
+    act.sets.pop();
+    renderActiveWorkoutSession();
+  } else {
+    showToast('至少需保留一組訓練！');
+  }
+}
     function addSetToSessionAction(actionId) {
       const act = activeSessionActions.find(a => a.id === actionId);
       if (act) {
