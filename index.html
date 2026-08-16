@@ -1972,11 +1972,17 @@ if (savedReadiness && savedReadiness.date === currentSystemTodayStr) {
       }
     }
 
-// ✅ 修正版：Puter.js 免 Key 平台期突破診斷
 async function requestGeminiPlateauBreakoutAdvice() {
   const btn = document.getElementById('btn-plateau-ai');
   const cardContent = document.getElementById('plateau-content');
-  if (btn) btn.innerHTML = `<span>⏳ AI 突破診斷中...</span>`;
+  
+  // 若按鈕已鎖定，直接擋下連點
+  if (btn && btn.disabled) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳ AI 突破診斷中...</span>`;
+  }
 
   try {
     const selectedAct = document.getElementById('trend-action-select')?.value || '槓鈴平躺臥推';
@@ -1997,7 +2003,11 @@ async function requestGeminiPlateauBreakoutAdvice() {
     }
     showToast("已載入精選平台期突破教練指引！");
   } finally {
-    if (btn) btn.innerHTML = `<span>⚡</span> 獲取 SiliconFlow AI 平台期突破建議`;
+    // 處理完成後解鎖按鈕
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>⚡</span> 獲取 SiliconFlow AI 平台期突破建議`;
+    }
   }
 }
     function openAIPickerPlanModal() {
@@ -2007,8 +2017,14 @@ async function requestGeminiPlateauBreakoutAdvice() {
 
     let tempAIGeneratedPlanData = null;
 
-    // ✅ 升級版 AI 菜單生成器 (支援多日分化與動態陣列)
+let isGeneratingPlan = false; // 全域防刷標記
+
 async function generatePlanWithGeminiAI() {
+  if (isGeneratingPlan) {
+    showToast("✨ AI 正在生成菜單中，請稍候...");
+    return;
+  }
+
   const goal = document.getElementById('ai-plan-target-goal').value;
   const split = document.getElementById('ai-plan-split-type').value;
   const days = document.getElementById('ai-plan-days-week').value;
@@ -2019,10 +2035,10 @@ async function generatePlanWithGeminiAI() {
   const tdee = userProfile.tdee || 2250;
   const weight = userProfile.weight || 68;
 
+  isGeneratingPlan = true;
   showToast("✨ AI 正在為您量身打造多日專屬菜單...");
 
   try {
-    // 嚴格規範 AI 生成的 JSON 結構必須包含 dailyPlans 陣列
     const prompt = `你是一位世界頂級的力量與體態雕塑教練。請根據以下學員數據生成多日訓練計畫：
 - 訓練目標: ${goal}
 - 計畫架構: ${split}
@@ -2056,7 +2072,6 @@ async function generatePlanWithGeminiAI() {
     tempAIGeneratedPlanData = parsedData;
     document.getElementById('ai-plan-generated-title').textContent = parsedData.planTitle;
     
-    // UI 渲染分頁顯示每日計畫
     let html = `<p class="font-bold text-main mb-2">💡 教練叮嚀: ${parsedData.advice}</p>`;
     parsedData.dailyPlans.forEach(day => {
       html += `<div class="mt-2 mb-1 p-2 card-bg-sub rounded-lg border theme-border-primary">`;
@@ -2076,9 +2091,12 @@ async function generatePlanWithGeminiAI() {
 
   } catch (err) {
     console.error("AI 菜單生成失敗:", err);
-    showToast(`❌ 生成失敗，請確認 API Key 或重試`);
+    showToast(`❌ 生成失敗，請確認網路或重試`);
+  } finally {
+    isGeneratingPlan = false; // 請求結束後解鎖
   }
 }
+    
 // ✅ 新增：將 AI 多日計畫批次轉化為獨立模板
 function applyAIGeneratedPlanToTemplates() {
   if (!tempAIGeneratedPlanData || !tempAIGeneratedPlanData.dailyPlans) {
@@ -4951,9 +4969,14 @@ async function handleAIFoodPhotoSelect(e) {
       throw new Error('API_FETCH_FAILED');
     }
 
-// ✅ 修正版：免 Key 啟動食物與條碼 AI 分析
+let isAIFoodAnalyzing = false; // 全域防刷標記
+
 async function startRealAIFoodAnalysis() {
-  // 移除舊的 effectiveKey 檢查，直接驗證是否有拍照圖片
+  if (isAIFoodAnalyzing) {
+    showToast('⚡ AI 正在分析中，請稍候...');
+    return;
+  }
+
   if (!currentAIFoodPhotoBase64) {
     showToast('請先拍攝實物或條碼照片！');
     triggerAIFoodPhotoUpload();
@@ -4967,6 +4990,8 @@ async function startRealAIFoodAnalysis() {
   if (overlay) overlay.classList.remove('hidden');
   document.getElementById('ai-result-card')?.classList.add('hidden');
 
+  isAIFoodAnalyzing = true;
+
   try {
     if (currentScanMode === 'barcode') {
       if (titleEl) titleEl.textContent = "條碼掃描辨識中...";
@@ -4974,7 +4999,6 @@ async function startRealAIFoodAnalysis() {
 
       let detectedBarcode = null;
 
-      // 第一步：使用 ZXing 進行本地影像條碼解碼
       try {
         if (window.ZXing) {
           const codeReader = new ZXing.BrowserMultiFormatReader();
@@ -4988,7 +5012,6 @@ async function startRealAIFoodAnalysis() {
         console.warn("ZXing 本地未檢測出標準條碼，準備啟動 AI 視覺備援:", zxingErr);
       }
 
-      // 若解碼成功，查詢 Open Food Facts 資料庫
       if (detectedBarcode) {
         if (descEl) descEl.textContent = `解碼成功 [${detectedBarcode}]！查詢營養資料庫中...`;
         const foodData = await fetchOpenFoodFactsByBarcode(detectedBarcode);
@@ -4996,7 +5019,6 @@ async function startRealAIFoodAnalysis() {
         if (foodData) return;
       }
 
-      // 第二步：條碼資料庫無記錄或未掃出，啟動 AI 視覺模型讀取包裝標籤
       if (descEl) descEl.textContent = "啟動 AI 視覺讀取包裝營養標籤...";
       const promptText = "這是一張食品包裝的條碼或背面營養成分表。請透過視覺讀取數據並回覆合法 JSON，格式為：{\"foodName\":\"食品名稱(或品牌)\",\"portion\":\"100g或1份\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":0,\"emoji\":\"📦\",\"confidence\":90}";
       
@@ -5008,7 +5030,6 @@ async function startRealAIFoodAnalysis() {
       showToast('✅ 包裝營養成分辨識成功！');
 
     } else {
-      // 食物實體拍照模式
       if (titleEl) titleEl.textContent = "AI 視覺辨識中...";
       if (descEl) descEl.textContent = "正在分析圖片中實物的熱量與三大營養素...";
 
@@ -5026,7 +5047,6 @@ async function startRealAIFoodAnalysis() {
     const errorMsg = err.message || '網絡請求超時';
     showToast(`❌ 辨識失敗: ${errorMsg}`);
     
-    // 降級跳出手動編輯卡片
     const fallbackFood = {
       foodName: currentScanMode === 'barcode' ? "條碼商品 (請手動修正)" : "未知食物 (請手動修正)",
       portion: "1份",
@@ -5040,6 +5060,7 @@ async function startRealAIFoodAnalysis() {
     };
     displayAIFoodResult(fallbackFood);
   } finally {
+    isAIFoodAnalyzing = false; // 分析結束後解鎖
     if (overlay) overlay.classList.add('hidden');
   }
 }
