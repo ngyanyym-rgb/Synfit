@@ -697,35 +697,18 @@
           </div>
         </div>
         
-      <!-- 雙 API Key 設置卡片 -->
-<div class="p-4 card-bg rounded-2xl border border-main shadow-lg space-y-3">
+<!-- Puter.js 全自動 AI 引擎 (免設定 Key) -->
+<div class="p-4 card-bg rounded-2xl border border-main shadow-lg space-y-2">
   <div class="flex justify-between items-center border-b border-main pb-2">
     <h3 class="text-xs font-bold theme-text-primary uppercase tracking-wider flex items-center gap-1.5">
-      <span>🔑</span> AI 雙引擎 API Key 設置
+      <span>🤖</span> Puter.js 全自動 AI 雙引擎
     </h3>
+    <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">免設定 Key</span>
   </div>
   <p class="text-[11px] text-sub leading-relaxed">
-    為了讓文字功能與拍照功能皆能穩定運作，請分別填入對應平台的專屬 Key：
+    全套小程式（拍照辨識、條碼解析、菜單生成、平台期診斷）已升級為 Puter.js 驅動，無須設定任何 API Key，開箱即用！
   </p>
-
-  <!-- 1. ChatAnywhere Key (文字菜單/建議) -->
-  <div class="space-y-1">
-    <label class="text-[10px] font-bold text-main block">💬 ChatAnywhere Key (菜單生成/平台期建議)</label>
-    <div class="flex gap-2">
-      <input id="chatanywhere-api-key-input" type="password" placeholder="輸入 sk-... Key" class="flex-1 card-bg-sub border border-main rounded-xl px-3 py-2 text-xs text-main focus:outline-none border-theme-primary font-mono">
-      <button onclick="saveChatAnywhereKey()" class="px-3 py-2 card-bg-sub border border-main text-xs font-bold rounded-xl text-sub hover:text-main">儲存</button>
-    </div>
-  </div>
-
-<!-- 2. SambaNova Key (食物拍照/條碼) -->
-<div class="space-y-1 pt-1">
-  <label class="text-[10px] font-bold theme-text-primary block">📸 SambaNova Key (免費食物拍照辨識/條碼)</label>
-  <div class="flex gap-2">
-    <input id="sambanova-api-key-input" type="password" placeholder="輸入 SambaNova Key" class="flex-1 card-bg-sub border border-main rounded-xl px-3 py-2 text-xs text-main focus:outline-none border-theme-primary font-mono">
-    <button onclick="saveSambaNovaApiKey()" class="px-3 py-2 card-bg-sub border border-main text-xs font-bold rounded-xl text-sub hover:text-main">儲存</button>
-  </div>
 </div>
-
         <div class="p-4 card-bg rounded-2xl border border-main shadow-lg space-y-3">
           <div class="flex justify-between items-center border-b border-main pb-2">
             <h3 class="text-xs font-bold theme-text-primary uppercase tracking-wider flex items-center gap-1.5">
@@ -1909,17 +1892,8 @@ if (savedSambaNovaKey) {
       }
     }
 
-// ✅ SiliconFlow Qwen2.5 文本顧問診斷
+// ✅ 修正版：Puter.js 免 Key 平台期突破診斷
 async function requestGeminiPlateauBreakoutAdvice() {
-  const effectiveKey = (PRESET_SILICONFLOW_API_KEY && !PRESET_SILICONFLOW_API_KEY.includes('xxx')) 
-    ? PRESET_SILICONFLOW_API_KEY 
-    : geminiApiKey;
-
-  if (!effectiveKey) {
-    showToast("⚠️ 請先至「我的」頁面設定您的 SiliconFlow API Key！");
-    return;
-  }
-  
   const btn = document.getElementById('btn-plateau-ai');
   const cardContent = document.getElementById('plateau-content');
   if (btn) btn.innerHTML = `<span>⏳ AI 突破診斷中...</span>`;
@@ -1931,7 +1905,7 @@ async function requestGeminiPlateauBreakoutAdvice() {
     const prompt = `你是一位世界級力量舉與肌肥大總教練。學員目前的運動項目是「${selectedAct}」，估算 1RM 為 ${perf.max1RM} kg。請根據當前 1RM 力量情況，給出 3 條具體、可執行的「平台期突破指南」（例如：調整訓練頻率、增強輔助動作、Deload 減量週，或走高次數容量累積）。格式請條理清晰，使用繁體中文。`;
 
     const messages = [{ role: "user", content: prompt }];
-    const text = await callSiliconFlowApi(messages, "Qwen/Qwen2.5-7B-Instruct", false);
+    const text = await callSiliconFlowApi(messages, "openai/gpt-4o-mini", false);
 
     if (text && cardContent) {
       cardContent.innerHTML = `<div class="card-bg-sub p-3 rounded-xl border border-main text-xs text-main leading-relaxed whitespace-pre-line">${text}</div>`;
@@ -1943,7 +1917,7 @@ async function requestGeminiPlateauBreakoutAdvice() {
     }
     showToast("已載入精選平台期突破教練指引！");
   } finally {
-    if (btn) btn.innerHTML = `<span>⚡</span> 獲取 AI 平台期突破建議`;
+    if (btn) btn.innerHTML = `<span>⚡</span> 獲取 SiliconFlow AI 平台期突破建議`;
   }
 }
     function openAIPickerPlanModal() {
@@ -2931,7 +2905,7 @@ function render1RMTrendChart() {
   `;
 }
 
-// ✅ 2. 升級版條碼檢索 (含動態遮罩 + 絕對響應兜底機制)
+// ✅ 修正版：Puter.js 免 Key 條碼檢索與 AI 備援
 async function fetchOpenFoodFactsByBarcode(barcode) {
   const cleanBarcode = String(barcode || '').trim();
   if (!cleanBarcode) {
@@ -2939,7 +2913,6 @@ async function fetchOpenFoodFactsByBarcode(barcode) {
     return null;
   }
 
-  // 開啟載入中遮罩，確保使用者視覺有即時反應
   const overlay = document.getElementById('ai-processing-overlay');
   const titleEl = document.getElementById('ai-processing-title');
   const descEl = document.getElementById('ai-processing-desc');
@@ -2981,34 +2954,28 @@ async function fetchOpenFoodFactsByBarcode(barcode) {
     console.warn("Open Food Facts 查詢跳過:", err);
   }
 
-  // 第二步：若資料庫查無，啟動 AI 檢索
+  // 第二步：若資料庫查無，直接啟動 Puter.js AI 檢索 (無需驗證 Key)
   if (!parsedFood) {
-    const apiKey = geminiApiKey || PRESET_SILICONFLOW_API_KEY;
-    if (apiKey) {
-      if (descEl) descEl.textContent = "資料庫無記錄，正在調用 AI 大模型智慧識別條碼...";
-      try {
-        const promptText = `請根據商品條碼數字「${cleanBarcode}」，估算該條碼常見包裝食品名稱與每100g營養數據。
+    if (descEl) descEl.textContent = "資料庫無記錄，正在調用 AI 智慧識別條碼...";
+    try {
+      const promptText = `請根據商品條碼數字「${cleanBarcode}」，估算該條碼常見包裝食品名稱與每100g營養數據。
 必須回覆純 JSON 格式：{"foodName":"商品名稱","portion":"100g","calories":熱量數字,"carbs":碳水數字,"protein":蛋白質數字,"fat":脂肪數字,"water":0,"emoji":"📦","confidence":85}`;
 
-        const responseText = await callSiliconFlowApi([{ role: "user", content: promptText }], "gpt-4o-mini", true);
-        const cleanJsonStr = extractJsonFromString(responseText);
-        parsedFood = JSON.parse(cleanJsonStr);
-      } catch (aiErr) {
-        console.error("AI 條碼檢索失敗:", aiErr);
-      }
+      const responseText = await callSiliconFlowApi([{ role: "user", content: promptText }], "openai/gpt-4o-mini", true);
+      const cleanJsonStr = extractJsonFromString(responseText);
+      parsedFood = JSON.parse(cleanJsonStr);
+    } catch (aiErr) {
+      console.error("AI 條碼檢索失敗:", aiErr);
     }
   }
 
-  // 關閉載入遮罩
   if (overlay) overlay.classList.add('hidden');
 
-  // 第三步：結果渲染（若完全查無資料，自動開啟手動填寫模式，絕不靜默無響應）
   if (parsedFood && parsedFood.foodName) {
     displayAIFoodResult(parsedFood);
     showToast(`✅ 成功取得「${parsedFood.foodName}」營養數據！`);
     return parsedFood;
   } else {
-    // 兜底預設卡片，確保輸入完畢後 100% 彈出編輯框
     const fallbackFood = {
       foodName: `條碼商品 (${cleanBarcode})`,
       portion: "100g",
@@ -3024,7 +2991,7 @@ async function fetchOpenFoodFactsByBarcode(barcode) {
     alert(`⚠️ 暫查無條碼 [${cleanBarcode}] 的精確數據，已為您開啟下方手動編輯卡片，可直接填寫熱量與營養素！`);
     return fallbackFood;
   }
-}      
+}
 
     function startRestTimer(seconds) {
       restTimeTotalSeconds = seconds; restTimeRemaining = seconds;
@@ -4989,11 +4956,10 @@ function calculateTotalSessionVolume(sessionActions) {
     return total + actVolume;
   }, 0);
 }
-// ==========================================
-// 🤖 雙 API 請求核心函數 (修正語法錯誤版)
-// ==========================================
 
-const PRESET_SILICONFLOW_API_KEY = '';
+// ==========================================
+// 🤖 Puter.js 統一 AI 請求核心函數 (免 Key 跨域)
+// ==========================================
 
 function extractJsonFromString(str) {
   if (!str) return '';
@@ -5002,54 +4968,28 @@ function extractJsonFromString(str) {
   return match ? match[0] : clean;
 }
 
-// 1️⃣ 文字 API 調用 (ChatAnywhere) -> 用於生成菜單與平台期建議
-async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseFormatJson = false) {
-  const apiKey = chatAnywhereKey;
-  if (!apiKey) {
-    showToast('⚠️ 請先至「我的」分頁設定 ChatAnywhere Key！');
-    throw new Error('MISSING_API_KEY');
-  }
-
-  const payload = {
-    model: model || 'gpt-4o-mini',
-    messages: messages,
-    stream: false
-  };
-
+// 1️⃣ Puter.js 純文字 AI 調用（菜單生成 / 平台期診斷 / 條碼估算）
+async function callSiliconFlowApi(messages, model = 'openai/gpt-4o-mini', responseFormatJson = false) {
+  let promptText = messages.map(m => m.content).join("\n");
   if (responseFormatJson) {
-    payload.response_format = { type: "json_object" };
+    promptText += "\n【重要指令】：請只回覆合法 JSON，嚴禁包含任何開場白、結尾說明或 Markdown 標籤。";
   }
 
-  const res = await fetch("https://api.chatanywhere.tech/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error?.message || `HTTP_${res.status}`);
-  }
-
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content;
+  const res = await puter.ai.chat(promptText, { model: 'openai/gpt-4o-mini' });
+  return res.toString();
 }
 
-// 3️⃣ 圖片視覺 API 函數 (Puter.js 免 Key 跨域極速視覺引擎)
+// 2️⃣ Puter.js 圖片視覺 AI 調用（食物拍照 / 條碼標籤辨識）
 async function callSambaNovaVisionApi(promptText, base64ImageUrl = null) {
   const fullPrompt = promptText + "\n【重要指令】：請只回覆合法 JSON 格式數據，嚴禁包含任何開場白或說明文字。";
 
-  // 直接呼叫 Puter.js 免費 AI，自動傳送 Base64 圖片給 Vision 模型
-  const response = await puter.ai.chat(
+  const res = await puter.ai.chat(
     fullPrompt,
     base64ImageUrl,
     { model: 'openai/gpt-4o-mini' }
   );
 
-  return response.toString();
+  return res.toString();
 }
 
 // ✅ Diet-Planner 7天智慧碳水循環分配器
