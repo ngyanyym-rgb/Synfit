@@ -1035,40 +1035,12 @@
     </div>
 
     <!-- Modal: Gemini AI Routine Generator -->
+    <!-- Modal: Gemini AI Routine Generator -->
     <div id="modal-ai-picker-plan" class="absolute inset-0 modal-bg backdrop-blur-md z-50 flex flex-col hidden">
       <div class="h-14 border-b border-main px-4 flex justify-between items-center card-bg shrink-0">
         <div class="flex items-center gap-2">
           <span class="theme-text-primary font-bold text-sm">🤖 SiliconFlow AI 智能菜單生成器</span>
         </div>
-        <!-- Modal: iOS 捷徑同步教學彈窗 -->
-<div id="modal-shortcut-guide" class="absolute inset-0 modal-bg backdrop-blur-md z-50 flex flex-col hidden">
-  <div class="h-14 border-b border-main px-4 flex justify-between items-center card-bg shrink-0">
-    <span class="theme-text-primary font-bold text-sm">📲 Apple Watch 捷徑自動同步設定</span>
-    <button onclick="closeModal('modal-shortcut-guide')" class="text-sub hover:text-main text-lg p-2">✕</button>
-  </div>
-  <div class="flex-1 overflow-y-auto p-4 space-y-3 text-xs text-sub leading-relaxed no-scrollbar">
-    <div class="card-bg p-3.5 rounded-2xl border border-main space-y-2">
-      <h5 class="font-bold text-main theme-text-primary">第一步：確認 Firebase 雲端密鑰</h5>
-      <p>請確保您已在「我的」分頁設定並綁定了專屬的雲端同步密鑰（如：<span id="guide-cloud-key-display" class="font-mono text-amber-400 font-bold">synfit_user_88</span>）。</p>
-    </div>
-    <div class="card-bg p-3.5 rounded-2xl border border-main space-y-2">
-      <h5 class="font-bold text-main theme-text-primary">第二步：建立 iPhone「捷徑」腳本</h5>
-      <p>打開 iPhone 的「捷徑 (Shortcuts)」App，新建自動化腳本：</p>
-      <ol class="list-decimal list-inside space-y-1 pl-1">
-        <li>新增動作：「搜尋健康樣本 (睡眠 / 靜止心率 / HRV)」。</li>
-        <li>新增動作：「取得 URL 內容 (POST)」。</li>
-        <li>設定 URL 為 Firebase API endpoint。</li>
-      </ol>
-    </div>
-    <div class="card-bg p-3.5 rounded-2xl border border-main space-y-2">
-      <h5 class="font-bold text-main theme-text-primary">第三步：設定 Webhook POST 網址</h5>
-      <p class="font-mono text-[10px] break-all bg-black/40 p-2 rounded-lg text-emerald-400 border border-slate-700">
-        https://firestore.googleapis.com/v1/projects/synfit-70721/databases/(default)/documents/synfit_health_sync/<span class="guide-key-placeholder text-amber-300">[你的同步Key]</span>
-      </p>
-      <p class="text-[10px] text-muted">每日早上自動執行後，Watch 數據將直接同步至 SynFit！</p>
-    </div>
-  </div>
-</div>
         <button onclick="closeModal('modal-ai-picker-plan')" class="text-sub hover:text-main p-2 text-lg">✕</button>
       </div>
       <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
@@ -1113,6 +1085,36 @@
           <button onclick="applyAIGeneratedPlanToTemplates()" class="w-full py-2.5 theme-bg-primary hover:opacity-90 font-bold rounded-xl text-xs shadow-lg transition-transform active:scale-95">
             📥 一鍵導入並儲存至「我的模板」
           </button>
+        </div>
+      </div>
+    </div> <!-- 👈 這裡才是 modal-ai-picker-plan 的結束位置 -->
+
+    <!-- Modal: iOS 捷徑同步教學彈窗 (應放在這裡) -->
+    <div id="modal-shortcut-guide" class="absolute inset-0 modal-bg backdrop-blur-md z-50 flex flex-col hidden">
+      <div class="h-14 border-b border-main px-4 flex justify-between items-center card-bg shrink-0">
+        <span class="theme-text-primary font-bold text-sm">📲 Apple Watch 捷徑自動同步設定</span>
+        <button onclick="closeModal('modal-shortcut-guide')" class="text-sub hover:text-main text-lg p-2">✕</button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-4 space-y-3 text-xs text-sub leading-relaxed no-scrollbar">
+        <div class="card-bg p-3.5 rounded-2xl border border-main space-y-2">
+          <h5 class="font-bold text-main theme-text-primary">第一步：確認 Firebase 雲端密鑰</h5>
+          <p>請確保您已在「我的」分頁設定並綁定了專屬的雲端同步密鑰（如：<span id="guide-cloud-key-display" class="font-mono text-amber-400 font-bold">synfit_user_88</span>）。</p>
+        </div>
+        <div class="card-bg p-3.5 rounded-2xl border border-main space-y-2">
+          <h5 class="font-bold text-main theme-text-primary">第二步：建立 iPhone「捷徑」腳本</h5>
+          <p>打開 iPhone 的「捷徑 (Shortcuts)」App，新建自動化腳本：</p>
+          <ol class="list-decimal list-inside space-y-1 pl-1">
+            <li>新增動作：「搜尋健康樣本 (睡眠 / 靜止心率 / HRV)」。</li>
+            <li>新增動作：「取得 URL 內容 (POST)」。</li>
+            <li>設定 URL 為 Firebase API endpoint。</li>
+          </ol>
+        </div>
+        <div class="card-bg p-3.5 rounded-2xl border border-main space-y-2">
+          <h5 class="font-bold text-main theme-text-primary">第三步：設定 Webhook POST 網址</h5>
+          <p class="font-mono text-[10px] break-all bg-black/40 p-2 rounded-lg text-emerald-400 border border-slate-700">
+            https://firestore.googleapis.com/v1/projects/synfit-70721/databases/(default)/documents/synfit_health_sync/<span class="guide-key-placeholder text-amber-300">[你的同步Key]</span>
+          </p>
+          <p class="text-[10px] text-muted">每日早上自動執行後，Watch 數據將直接同步至 SynFit！</p>
         </div>
       </div>
     </div>
