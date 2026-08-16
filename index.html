@@ -11,6 +11,8 @@
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+<!-- Puter.js 免 API Key 全前端 AI 視覺庫 -->
+<script src="https://js.puter.com/v2/"></script>
   <!-- ZXing 本地條碼解析庫 CDN -->
 <script src="https://unpkg.com/@zxing/library@latest"></script>
   
@@ -4664,13 +4666,9 @@ async function handleAIFoodPhotoSelect(e) {
       throw new Error('API_FETCH_FAILED');
     }
 
-// ✅ 修正版：使用 OpenRouter Key 進行食物與條碼 AI 分析
+// ✅ 修正版：免 Key 啟動食物與條碼 AI 分析
 async function startRealAIFoodAnalysis() {
- const effectiveKey = sambanovaApiKey || chatAnywhereKey;
-  if (!effectiveKey) {
-    showToast('⚠️ 請先至「我的」分頁設定您的 Github Key！');
-    return;
-  }
+  // 移除舊的 effectiveKey 檢查，直接驗證是否有拍照圖片
   if (!currentAIFoodPhotoBase64) {
     showToast('請先拍攝實物或條碼照片！');
     triggerAIFoodPhotoUpload();
@@ -4713,8 +4711,8 @@ async function startRealAIFoodAnalysis() {
         if (foodData) return;
       }
 
-      // 第二步：條碼資料庫無記錄或未掃出，啟動 OpenRouter 視覺模型讀取包裝標籤
-      if (descEl) descEl.textContent = "啟動 OpenRouter AI 視覺讀取包裝營養標籤...";
+      // 第二步：條碼資料庫無記錄或未掃出，啟動 AI 視覺模型讀取包裝標籤
+      if (descEl) descEl.textContent = "啟動 AI 視覺讀取包裝營養標籤...";
       const promptText = "這是一張食品包裝的條碼或背面營養成分表。請透過視覺讀取數據並回覆合法 JSON，格式為：{\"foodName\":\"食品名稱(或品牌)\",\"portion\":\"100g或1份\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":0,\"emoji\":\"📦\",\"confidence\":90}";
       
       const responseText = await callSambaNovaVisionApi(promptText, currentAIFoodPhotoBase64);
@@ -4726,7 +4724,7 @@ async function startRealAIFoodAnalysis() {
 
     } else {
       // 食物實體拍照模式
-      if (titleEl) titleEl.textContent = "OpenRouter AI 視覺辨識中...";
+      if (titleEl) titleEl.textContent = "AI 視覺辨識中...";
       if (descEl) descEl.textContent = "正在分析圖片中實物的熱量與三大營養素...";
 
       const promptText = "請精準識別圖片中的食物，必須回覆合法 JSON，格式為：{\"foodName\":\"繁體中文名稱\",\"portion\":\"份量估算\",\"calories\":熱量數字,\"carbs\":碳水數字,\"protein\":蛋白質數字,\"fat\":脂肪數字,\"water\":水分數字,\"emoji\":\"適當Emoji\",\"confidence\":95}";
@@ -4736,10 +4734,10 @@ async function startRealAIFoodAnalysis() {
 
       currentAIFoodResult = parsed;
       displayAIFoodResult(parsed);
-      showToast('✅ OpenRouter AI 食物辨識成功！');
+      showToast('✅ AI 食物辨識成功！');
     }
   } catch (err) {
-    console.error("OpenRouter 辨識詳細錯誤:", err);
+    console.error("AI 辨識詳細錯誤:", err);
     const errorMsg = err.message || '網絡請求超時';
     showToast(`❌ 辨識失敗: ${errorMsg}`);
     
@@ -5040,45 +5038,18 @@ async function callSiliconFlowApi(messages, model = 'gpt-4o-mini', responseForma
   return data.choices?.[0]?.message?.content;
 }
 
-// 3️⃣ 圖片視覺 API 函數 (SambaNova Cloud 視覺引擎)
+// 3️⃣ 圖片視覺 API 函數 (Puter.js 免 Key 跨域極速視覺引擎)
 async function callSambaNovaVisionApi(promptText, base64ImageUrl = null) {
- const apiKey = sambanovaApiKey || chatAnywhereKey;
+  const fullPrompt = promptText + "\n【重要指令】：請只回覆合法 JSON 格式數據，嚴禁包含任何開場白或說明文字。";
 
-  if (!apiKey) {
-    showToast('⚠️ 請先至「我的」分頁設定 SambaNova Key！');
-    throw new Error('MISSING_API_KEY');
-  }
+  // 直接呼叫 Puter.js 免費 AI，自動傳送 Base64 圖片給 Vision 模型
+  const response = await puter.ai.chat(
+    fullPrompt,
+    base64ImageUrl,
+    { model: 'openai/gpt-4o-mini' }
+  );
 
-  const fullPrompt = promptText + "\n【重要指令】：請只回覆合法 JSON，嚴禁包含任何開場白說明或 Markdown 標籤。";
-  const messagesContent = [{ type: "text", text: fullPrompt }];
-
-  if (base64ImageUrl) {
-    messagesContent.push({
-      type: "image_url",
-      image_url: { url: base64ImageUrl }
-    });
-  }
-
-  const res = await fetch("https://api.sambanova.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "Llama-3.2-11B-Vision-Instruct",
-      messages: [{ role: "user", content: messagesContent }]
-    })
-  });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    console.error("SambaNova API 錯誤詳情:", errData);
-    throw new Error(errData.error?.message || `HTTP_${res.status}`);
-  }
-
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content;
+  return response.toString();
 }
 
 // ✅ Diet-Planner 7天智慧碳水循環分配器
