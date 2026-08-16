@@ -2643,6 +2643,7 @@ const foodDatabase = [
     let currentPlanActionCatFilter = '全部';
     let currentSelectedMeal = '早餐';
     let actionPickerMode = 'plan'; 
+        let replaceTargetActionId = null; // 記錄當前正在被替換的動作 ID
 
     let userProfile = {
       name: 'SynFit 健身達人', avatar: '🏋️‍♂️', gender: 'male', theme: 'bw-light', 
@@ -3054,8 +3055,57 @@ async function fetchOpenFoodFactsByBarcode(barcode) {
         renderActiveWorkoutSession();
       }
     }
+// 🗑️ 訓練期間刪除指定動作
+function removeActionFromActiveSession(actionId) {
+  const idx = activeSessionActions.findIndex(a => a.id === actionId);
+  if (idx > -1) {
+    const actName = activeSessionActions[idx].name;
+    activeSessionActions.splice(idx, 1);
+    renderActiveWorkoutSession();
+    showToast(`🗑️ 已刪除動作「${actName}」`);
+  }
+}
 
-    function renderActiveWorkoutSession() {
+// 🔄 開啟替換動作選擇彈窗
+function openReplaceActionPicker(actionId) {
+  actionPickerMode = 'replace';
+  replaceTargetActionId = actionId;
+  currentPlanActionCatFilter = '全部';
+  const searchInput = document.getElementById('plan-action-search-input');
+  if (searchInput) searchInput.value = '';
+  document.getElementById('modal-action-picker-for-plan').classList.remove('hidden');
+  renderActionPickerForPlanList();
+}
+
+// 🔄 執行替換動作
+function replaceActionInActiveSession(newActId) {
+  const idx = activeSessionActions.findIndex(a => a.id === replaceTargetActionId);
+  const newActObj = actionDatabase.find(a => a.id === newActId);
+
+  if (idx > -1 && newActObj) {
+    const perf = getActionHistoryPerformance(newActObj.name);
+    const defaultWeight = perf.lastWeight || 20;
+    const defaultReps = perf.lastReps || 10;
+
+    // 保留原本設定的組數長度，載入新動作預設重量與次數
+    const oldCount = activeSessionActions[idx].sets ? activeSessionActions[idx].sets.length : 3;
+    const newSets = [];
+    for (let i = 0; i < oldCount; i++) {
+      newSets.push({ weight: defaultWeight, reps: defaultReps, type: 'N', rpe: 8, rest: 60, done: false });
+    }
+
+    activeSessionActions[idx] = {
+      id: newActObj.id,
+      name: newActObj.name,
+      sets: newSets
+    };
+
+    closeModal('modal-action-picker-for-plan');
+    renderActiveWorkoutSession();
+    showToast(`🔄 已成功替換為「${newActObj.name}」！`);
+  }
+}
+function renderActiveWorkoutSession() {
       const container = document.getElementById('session-actions-container');
       if (!container) return;
 
@@ -3072,7 +3122,11 @@ async function fetchOpenFoodFactsByBarcode(barcode) {
                 <h4 class="text-sm font-bold text-main">${act.name}</h4>
                 <p class="text-[10px] theme-text-primary font-mono mt-0.5">${historyText}</p>
               </div>
-              <button onclick="addSetToSessionAction(${act.id})" class="text-xs theme-text-primary font-bold px-2 py-1 theme-bg-alpha rounded-lg border theme-border-alpha">+ 加一組</button>
+              <div class="flex items-center gap-1.5">
+                <button onclick="openReplaceActionPicker(${act.id})" class="text-[11px] theme-text-primary font-bold px-2 py-1 theme-bg-alpha rounded-lg border theme-border-alpha hover:opacity-80">🔄 替換</button>
+                <button onclick="removeActionFromActiveSession(${act.id})" class="text-[11px] text-rose-400 font-bold px-2 py-1 bg-rose-500/10 rounded-lg border border-rose-500/20 hover:bg-rose-500/20">🗑️ 刪除</button>
+                <button onclick="addSetToSessionAction(${act.id})" class="text-[11px] theme-text-primary font-bold px-2 py-1 theme-bg-alpha rounded-lg border theme-border-alpha">+ 加一組</button>
+              </div>
             </div>
 
             <div class="space-y-2">
@@ -3948,48 +4002,74 @@ function getActionImage(item) {
 
     function filterPlanActionCategory(cat) { currentPlanActionCatFilter = cat; renderActionPickerForPlanList(); }
 
-    function renderActionPickerForPlanList() {
-      const container = document.getElementById('plan-action-picker-render-list');
-      if (!container) return;
-      const keyword = document.getElementById('plan-action-search-input')?.value.trim().toLowerCase() || '';
+   function renderActionPickerForPlanList() {
+  const container = document.getElementById('plan-action-picker-render-list');
+  if (!container) return;
+  const keyword = document.getElementById('plan-action-search-input')?.value.trim().toLowerCase() || '';
 
-      const filtered = actionDatabase.filter(act => {
-        const matchCat = currentPlanActionCatFilter === '全部' || act.part === currentPlanActionCatFilter;
-        const matchKey = act.name.toLowerCase().includes(keyword);
-        return matchCat && matchKey;
-      });
+  const filtered = actionDatabase.filter(act => {
+    const matchCat = currentPlanActionCatFilter === '全部' || act.part === currentPlanActionCatFilter;
+    const matchKey = act.name.toLowerCase().includes(keyword);
+    return matchCat && matchKey;
+  });
 
-      const targetArray = actionPickerMode === 'active' ? activeSessionActions : customPlanActions;
+  const badge = document.getElementById('plan-action-count-badge');
+  if (actionPickerMode === 'replace') {
+    if (badge) badge.textContent = `選擇要替換的動作`;
+  } else {
+    const targetArray = actionPickerMode === 'active' ? activeSessionActions : customPlanActions;
+    if (badge) badge.textContent = `已選 ${targetArray.length} 個`;
+  }
 
-      const badge = document.getElementById('plan-action-count-badge');
-      if (badge) badge.textContent = `已選 ${targetArray.length} 個`;
+  if (filtered.length === 0) {
+    container.innerHTML = `<p class="text-xs text-muted text-center py-8">未找到符合條件的動作</p>`;
+    return;
+  }
 
-      if (filtered.length === 0) {
-        container.innerHTML = `<p class="text-xs text-muted text-center py-8">未找到符合條件的動作</p>`;
-        return;
-      }
-
-      container.innerHTML = filtered.map(act => {
-        const isSelected = targetArray.some(a => a.id === act.id);
-        return `
-          <div class="p-3 card-bg rounded-2xl border ${isSelected ? 'theme-border-primary theme-bg-alpha' : 'border-main'} flex items-center justify-between transition-all">
-            <div class="flex items-center gap-3">
-             <img src="${getActionImage(act)}" class="w-10 h-10 rounded-xl object-cover card-bg-sub border border-main" alt="${act.name}">
-              <div>
-                <h4 class="text-xs font-bold text-main">${act.name}</h4>
-                <div class="flex gap-1.5 mt-0.5">
-                  <span class="text-[9px] px-1.5 py-0.2 rounded theme-bg-alpha theme-text-primary font-medium">${act.part}</span>
-                  <span class="text-[9px] px-1.5 py-0.2 rounded card-bg-sub text-sub font-medium">${act.equip}</span>
-                </div>
+  container.innerHTML = filtered.map(act => {
+    // 替換模式：顯示「選擇替換」按鈕
+    if (actionPickerMode === 'replace') {
+      return `
+        <div class="p-3 card-bg rounded-2xl border border-main flex items-center justify-between transition-all">
+          <div class="flex items-center gap-3">
+            <img src="${getActionImage(act)}" class="w-10 h-10 rounded-xl object-cover card-bg-sub border border-main" alt="${act.name}">
+            <div>
+              <h4 class="text-xs font-bold text-main">${act.name}</h4>
+              <div class="flex gap-1.5 mt-0.5">
+                <span class="text-[9px] px-1.5 py-0.2 rounded theme-bg-alpha theme-text-primary font-medium">${act.part}</span>
+                <span class="text-[9px] px-1.5 py-0.2 rounded card-bg-sub text-sub font-medium">${act.equip}</span>
               </div>
             </div>
-            <button onclick="toggleSelectActionForPlan(${act.id}); renderActionPickerForPlanList();" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${isSelected ? 'theme-bg-primary font-black shadow-md' : 'card-bg-sub border border-main theme-text-primary hover:opacity-80'}">
-              ${isSelected ? '✓ 已加入' : '+ 加入'}
-            </button>
           </div>
-        `;
-      }).join('');
+          <button onclick="replaceActionInActiveSession(${act.id})" class="px-3 py-1.5 rounded-xl text-xs font-black theme-bg-primary shadow-md hover:opacity-90">
+            🔄 選擇替換
+          </button>
+        </div>
+      `;
     }
+
+    // 一般選取模式
+    const targetArray = actionPickerMode === 'active' ? activeSessionActions : customPlanActions;
+    const isSelected = targetArray.some(a => a.id === act.id);
+    return `
+      <div class="p-3 card-bg rounded-2xl border ${isSelected ? 'theme-border-primary theme-bg-alpha' : 'border-main'} flex items-center justify-between transition-all">
+        <div class="flex items-center gap-3">
+          <img src="${getActionImage(act)}" class="w-10 h-10 rounded-xl object-cover card-bg-sub border border-main" alt="${act.name}">
+          <div>
+            <h4 class="text-xs font-bold text-main">${act.name}</h4>
+            <div class="flex gap-1.5 mt-0.5">
+              <span class="text-[9px] px-1.5 py-0.2 rounded theme-bg-alpha theme-text-primary font-medium">${act.part}</span>
+              <span class="text-[9px] px-1.5 py-0.2 rounded card-bg-sub text-sub font-medium">${act.equip}</span>
+            </div>
+          </div>
+        </div>
+        <button onclick="toggleSelectActionForPlan(${act.id}); renderActionPickerForPlanList();" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${isSelected ? 'theme-bg-primary font-black shadow-md' : 'card-bg-sub border border-main theme-text-primary hover:opacity-80'}">
+          ${isSelected ? '✓ 已加入' : '+ 加入'}
+        </button>
+      </div>
+    `;
+  }).join('');
+}
 
     function openCreateActionModal() {
       tempNewActionImgBase64 = '';
