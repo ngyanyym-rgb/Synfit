@@ -1110,12 +1110,17 @@
           </ol>
         </div>
         <div class="card-bg p-3.5 rounded-2xl border border-main space-y-2">
-          <h5 class="font-bold text-main theme-text-primary">第三步：設定 Webhook POST 網址</h5>
-          <p class="font-mono text-[10px] break-all bg-black/40 p-2 rounded-lg text-emerald-400 border border-slate-700">
-            https://firestore.googleapis.com/v1/projects/synfit-70721/databases/(default)/documents/synfit_health_sync/<span class="guide-key-placeholder text-amber-300">[你的同步Key]</span>
-          </p>
-          <p class="text-[10px] text-muted">每日早上自動執行後，Watch 數據將直接同步至 SynFit！</p>
-        </div>
+      <h5 class="font-bold text-main theme-text-primary">第三步：設定 Webhook POST 網址</h5>
+      <div class="flex items-center justify-between gap-2 bg-black/40 p-2 rounded-lg border border-slate-700">
+        <p class="font-mono text-[10px] break-all text-emerald-400">
+          https://firestore.googleapis.com/v1/projects/synfit-70721/databases/(default)/documents/synfit_health_sync/<span class="guide-key-placeholder text-amber-300">[你的同步Key]</span>
+        </p>
+        <button onclick="copyShortcutWebhookUrl()" class="px-2.5 py-1 theme-bg-primary font-bold text-[10px] rounded-lg shrink-0 shadow active:scale-95">
+          複製
+        </button>
+      </div>
+      <p class="text-[10px] text-muted">每日早上自動執行後，Watch 數據將直接同步至 SynFit！</p>
+    </div>
       </div>
     </div>
 
@@ -1826,29 +1831,16 @@ window.onload = async function() {
     const toggle = document.getElementById('voice-coach-toggle');
     if (toggle) toggle.checked = voiceCoachEnabled;
 
-    // 3. 讀取雲端同步 Key
-    const savedCloudKey = await dbGetItem('synfit_cloud_key');
-    if (savedCloudKey) {
-      cloudSyncKey = savedCloudKey;
-      const keyInput = document.getElementById('cloud-sync-key-input');
-      if (keyInput) keyInput.value = cloudSyncKey;
-      updateCloudSyncBadge('已綁定', 'bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+    // 3. 讀取雲端同步 Key (若無則自動生成獨立專屬亂數 Key)
+    let savedCloudKey = await dbGetItem('synfit_cloud_key');
+    if (!savedCloudKey) {
+      savedCloudKey = 'synfit_' + Math.random().toString(36).substring(2, 10);
+      await dbSetItem('synfit_cloud_key', savedCloudKey);
     }
-
-    // 4. 讀取雙 API Key (ChatAnywhere & Google Gemini)
-    const savedChatKey = await dbGetItem('synfit_chatanywhere_api_key');
-    if (savedChatKey) {
-      chatAnywhereKey = savedChatKey;
-      const cInput = document.getElementById('chatanywhere-api-key-input');
-      if (cInput) cInput.value = chatAnywhereKey;
-    }
-
- const savedSambaNovaKey = await dbGetItem('synfit_sambanova_api_key');
-if (savedSambaNovaKey) {
-  sambanovaApiKey = savedSambaNovaKey;
-  const sInput = document.getElementById('sambanova-api-key-input');
-  if (sInput) sInput.value = sambanovaApiKey;
-}
+    cloudSyncKey = savedCloudKey;
+    const keyInput = document.getElementById('cloud-sync-key-input');
+    if (keyInput) keyInput.value = cloudSyncKey;
+    updateCloudSyncBadge('已綁定', 'bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
 
     // 5. 日期與系統狀態對齊
     const now = new Date();
@@ -2149,7 +2141,7 @@ function applyAIGeneratedPlanToTemplates() {
       }
     }
 
-    // 修復版雲端同步 (使用 IndexedDB 資料源 & Firestore)
+   // 修復與瘦身版雲端同步 (照片僅保留於手機本地，雲端只備份文字與組數數據)
     async function syncDataToCloud() {
       if (!cloudSyncKey) {
         showToast("⚠️ 請先輸入並綁定雲端同步密鑰！"); return;
@@ -2158,9 +2150,19 @@ function applyAIGeneratedPlanToTemplates() {
       showToast("☁️ 正在上傳數據至雲端 Firestore...");
 
       try {
+        // 剔除打卡照片的 Base64 數據，僅保留組數與心得數據，避免突破 1MB 限制
+        const slimAlbumLogs = albumCheckInLogs.map(log => {
+          const { img, ...rest } = log;
+          return { ...rest, img: '[本地圖片]' };
+        });
+
         const payload = JSON.stringify({
           updatedAt: new Date().toISOString(),
-          userProfile, albumCheckInLogs, dietHistoryMap, dietGoals, customTemplates, geminiApiKey
+          userProfile, 
+          albumCheckInLogs: slimAlbumLogs, 
+          dietHistoryMap, 
+          dietGoals, 
+          customTemplates
         });
 
         // 寫入 Firestore
@@ -2177,7 +2179,6 @@ function applyAIGeneratedPlanToTemplates() {
         showToast("❌ 備份失敗，請檢查網路或 Firebase 設定");
       }
     }
-
     // 修復版雲端還原 (使用 IndexedDB 資料源 & Firestore)
     async function pullDataFromCloud() {
       if (!cloudSyncKey) {
@@ -2946,7 +2947,21 @@ function evaluateFatigueStatus(partSetCounts) {
     desc.textContent = `💡 今日生理準備度 ${readinessProfile.score}%，當前最高單部位組數未超動態門檻 (${dynamicThreshold} 組)。請保持穩定恢復！`;
   }
 }
-
+// 📋 一鍵複製 iOS 捷徑 Webhook 網址
+function copyShortcutWebhookUrl() {
+  const key = cloudSyncKey || 'YOUR_KEY';
+  const url = `https://firestore.googleapis.com/v1/projects/synfit-70721/databases/(default)/documents/synfit_health_sync/${key}`;
+  
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('📋 Webhook 網址已複製到剪貼簿！');
+    }).catch(() => {
+      showToast('❌ 複製失敗，請手動長按選擇網址');
+    });
+  } else {
+    showToast('❌ 瀏覽器不支援自動複製，請手動選擇網址');
+  }
+}
 function openShortcutGuideModal() {
   const keyDisplay = document.getElementById('guide-cloud-key-display');
   if (keyDisplay) keyDisplay.textContent = cloudSyncKey || '尚未綁定 (請至「我的」分頁設定)';
